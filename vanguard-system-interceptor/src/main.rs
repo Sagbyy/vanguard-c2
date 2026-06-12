@@ -1,12 +1,14 @@
 mod cli;
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
+use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 use clap::Parser;
 use futures::StreamExt;
 use uuid::Uuid;
 use vanguard_core::{
-    Interceptor, InterceptorState, PlatformInterceptor, Position, THREATS_SUBJECT, Threat,
+    DetectedThreat, Interceptor, InterceptorReport, InterceptorState, PlatformInterceptor,
+    Position, Speed, THREATS_SUBJECT, Threat, report_subject,
 };
 
 use crate::cli::Args;
@@ -52,12 +54,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let nats_url = std::env::var("NATS_URL").unwrap_or_else(|_| DEFAULT_NATS_URL.to_string());
     let client = async_nats::connect(&nats_url).await?;
     let mut threat_updates = client.subscribe(THREATS_SUBJECT).await?;
+    let reports_subject = report_subject(&platform.id);
     println!(
-        "{} radar active — listening on `{THREATS_SUBJECT}` via {nats_url}",
+        "{} radar active — listening on `{THREATS_SUBJECT}`, reporting on `{reports_subject}`",
         platform.name,
     );
 
     let mut acquired: HashSet<Uuid> = HashSet::new();
+    // Last sighting per threat, used to estimate its speed vector (Δpos / Δt),
+    // exactly like a real tracking radar: the platform never reads the
+    // ground-truth speed.
+    let mut last_seen: HashMap<Uuid, (Position, Instant)> = HashMap::new();
 
     while let Some(message) = threat_updates.next().await {
         let threats: Vec<Threat> = match serde_json::from_slice(&message.payload) {
@@ -68,7 +75,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         };
 
+        let now = Instant::now();
+        let mut contacts: Vec<DetectedThreat> = Vec::new();
         let mut in_range = Vec::new();
+
         for threat in &threats {
             let range = platform.position.distance(&threat.position);
             if range > platform.range {
@@ -85,6 +95,25 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     range,
                 );
             }
+
+            let speed = match last_seen.get(&threat.id) {
+                Some((previous, at)) => {
+                    let dt = now.duration_since(*at).as_secs_f64();
+                    Speed {
+                        x: (threat.position.x - previous.x) / dt,
+                        y: (threat.position.y - previous.y) / dt,
+                    }
+                }
+                None => Speed { x: 0.0, y: 0.0 },
+            };
+            last_seen.insert(threat.id, (threat.position.clone(), now));
+
+            contacts.push(DetectedThreat {
+                id: threat.id,
+                position: threat.position.clone(),
+                speed,
+                threat_level: threat.threat_level,
+            });
             in_range.push(format!("{} at {:.0} m", short(&threat.id), range));
         }
 
@@ -93,6 +122,26 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         } else {
             println!("{} radar: {}", platform.name, in_range.join(", "));
         }
+
+        let report = InterceptorReport {
+            platform_id: platform.id,
+            threats: contacts,
+            interceptors_remaining: platform
+                .interceptors
+                .iter()
+                .filter(|i| matches!(i.state, InterceptorState::Idle))
+                .count(),
+            timestamp: unix_timestamp_ms(),
+        };
+
+        match serde_json::to_vec(&report) {
+            Ok(payload) => {
+                if let Err(error) = client.publish(reports_subject.clone(), payload.into()).await {
+                    eprintln!("{} failed to publish report: {error}", platform.name);
+                }
+            }
+            Err(error) => eprintln!("{} failed to serialize report: {error}", platform.name),
+        }
     }
 
     Ok(())
@@ -100,4 +149,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 fn short(id: &Uuid) -> String {
     id.to_string()[..8].to_string()
+}
+
+fn unix_timestamp_ms() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("system clock is set before the unix epoch")
+        .as_millis() as u64
 }

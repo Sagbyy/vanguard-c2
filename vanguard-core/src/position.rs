@@ -29,7 +29,7 @@ impl Position {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Speed {
     pub x: f64,
     pub y: f64,

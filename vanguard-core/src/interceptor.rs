@@ -1,3 +1,4 @@
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::position::{Position, Speed};
@@ -35,7 +36,7 @@ pub enum InterceptorState {
     Destroyed,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct InterceptorReport {
     pub platform_id: Uuid,
     pub threats: Vec<DetectedThreat>,
@@ -43,7 +44,7 @@ pub struct InterceptorReport {
     pub timestamp: u64,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct DetectedThreat {
     pub id: Uuid,
     pub position: Position,
