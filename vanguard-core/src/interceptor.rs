@@ -1,6 +1,6 @@
 use uuid::Uuid;
 
-use crate::position::Position;
+use crate::position::{Position, Speed};
 
 #[derive(Clone, Debug)]
 pub struct PlatformInterceptor {
@@ -9,8 +9,10 @@ pub struct PlatformInterceptor {
     pub position: Position,
     pub interceptors: Vec<Interceptor>,
     pub range: f64,
+    pub neighbor_platforms: Vec<PlatformInterceptor>
 }
 
+// possibilité: étendre le lien par la suite
 #[derive(Clone, Debug)]
 pub struct Interceptor {
     pub id: Uuid,
@@ -38,5 +40,6 @@ pub struct InterceptorReport {
 pub struct DetectedThreat {
     pub id: Uuid,
     pub position: Position,
+    pub speed: Speed,
     pub threat_level: usize,
 }

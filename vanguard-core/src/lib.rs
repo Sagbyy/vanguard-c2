@@ -1,5 +1,8 @@
 pub mod interceptor;
 pub mod position;
+pub mod events;
+
+pub use events::Message;
 
 pub use interceptor::{
     DetectedThreat,
@@ -9,5 +12,5 @@ pub use interceptor::{
     PlatformInterceptor,
 };
 
-pub use position::Position;
+pub use position::{Position, Speed};
 pub use uuid::Uuid;

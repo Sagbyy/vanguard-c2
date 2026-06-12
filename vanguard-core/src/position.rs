@@ -12,3 +12,9 @@ impl Position {
         (dx * dx + dy * dy).sqrt()
     }
 }
+
+#[derive(Clone, Debug)]
+pub struct Speed{
+    pub x: f64,
+    pub y: f64
+}
