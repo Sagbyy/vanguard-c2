@@ -9,7 +9,14 @@ pub struct PlatformInterceptor {
     pub position: Position,
     pub interceptors: Vec<Interceptor>,
     pub range: f64,
-    pub neighbor_platforms: Vec<PlatformInterceptor>
+    pub neighbor_platforms: Vec<NeighborPlatform>
+}
+
+#[derive(Clone, Debug)]
+pub struct NeighborPlatform {
+    pub id: Uuid,
+    pub position: Position,
+    pub interceptors_remaining: usize,
 }
 
 // possibilité: étendre le lien par la suite
