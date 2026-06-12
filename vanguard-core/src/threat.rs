@@ -1,11 +1,14 @@
-use crate::Position;
+use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
-pub type InterceptorId = uuid::Uuid;
+use crate::position::Position;
 
-#[derive(Clone, Debug)]
-pub struct DetectedThreat {
-    pub id: InterceptorId,
+/// Ground-truth threat: what actually exists on the map
+/// (`DetectedThreat` is what a platform sees of it).
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Threat {
+    pub id: Uuid,
     pub position: Position,
+    pub speed: f64,
     pub threat_level: usize,
 }
-

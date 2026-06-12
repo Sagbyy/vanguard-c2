@@ -1,13 +1,12 @@
 [package]
-name = "vanguard-system-interceptor"
+name = "vanguard-map"
 version = "0.1.0"
 edition = "2024"
 
 [dependencies]
 async-nats = "0.42"
-clap = { version = "4.6.1", features = ["derive"] }
-futures = "0.3"
+rand = "0.8"
 serde_json = "1"
-tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "time"] }
 uuid = { version = "1.23.3", features = ["v4"] }
 vanguard-core = { path = "../vanguard-core" }
