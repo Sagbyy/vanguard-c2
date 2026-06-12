@@ -1,36 +1,49 @@
+mod models;
+mod orders;
+mod orchestrator;
+
+use models::*;
 fn main() {
-    println!("Hello, world!");
-}
+    let interceptors = vec![
+        Interceptor {
+            id: 1,
+            position: Position {
+                x: 0.0,
+                y: 0.0,
+                z: 0.0,
+            },
+            sight_angle: 120.0,
+            sight_reach: 500.0,
+            turn_speed: 30.0,
+            ammo_remaining: 10,
+        },
+    ];
 
+    let reports = vec![
+        InterceptorReport {
+            interceptor_id: 1,
+            position: Position {
+                x: 0.0,
+                y: 0.0,
+                z: 0.0,
+            },
+            threats: vec![Threat {
+                id: 100,
+                position: Position {
+                    x: 50.0,
+                    y: 10.0,
+                    z: 0.0,
+                },
+                threat_level: 5,
+            }],
+        },
+    ];
 
-struct Interceptor{
+    let mut orchestrator =
+        OrchestratorState::new(interceptors);
 
-}
-
-struct Position{
-    x: usize,
-    y: usize,
-    z: usize
-}
-
-struct DetectedThreat{
-    position: Position,
-    thread_level: usize, //i think it's better because it's good
-}
-
-struct InterceptorMessage{
-    interceptor_type:
-    positon: Position,
-    angle: angle,
-    threats: Vec<Threat>,
-    used_ammo: usize, // used_ammo or ammo_amount?
-}
-
-struct Orchestrator;
-
-fn main{
-    // lit dans un dossier tout ce qui est mis directement
-    // décide de ce qui se passe
-    // essaie de les overlap
-    // il faut gérer les tics facilement
+    let commands = orchestrator.tick(&reports);
+    for command in commands {
+        println!("{command:?}");
+    }
 }
