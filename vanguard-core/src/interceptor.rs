@@ -50,4 +50,20 @@ pub struct DetectedThreat {
     pub position: Position,
     pub speed: Speed,
     pub threat_level: usize,
+    pub classification: ThreatClassification,
+    pub confidence: f64,
+    pub detected_at: f64,
+}
+
+#[derive(Clone, Debug)]
+pub enum ThreatClassification {
+    Unknown,
+    Drone,
+    FPVDrone,
+    Helicopter,
+    Aircraft,
+    CruiseMissile,
+    BallisticMissile,
+    Friendly,
+    Civilian,
 }
