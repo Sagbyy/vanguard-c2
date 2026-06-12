@@ -6,4 +6,5 @@ members = [
     "vanguard-map",
     "vanguard-orchestrator",
     "vanguard-system-interceptor",
+    "vanguard-platform"
 ]

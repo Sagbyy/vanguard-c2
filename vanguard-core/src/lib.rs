@@ -5,7 +5,8 @@ pub mod threat;
 
 pub use events::Message;
 pub use interceptor::{
-    DetectedThreat, Interceptor, InterceptorReport, InterceptorState, PlatformInterceptor,
+    DetectedThreat, Interceptor, InterceptorReport, InterceptorState, NeighborPlatform,
+    PlatformInterceptor,
 };
 pub use position::{Position, Speed};
 pub use threat::Threat;

@@ -29,7 +29,11 @@ impl Position {
     }
 }
 
+<<<<<<< HEAD
 #[derive(Clone, Debug, Serialize, Deserialize)]
+=======
+#[derive(Clone, Debug, Deserialize, Serialize)]
+>>>>>>> 4c48533 (platform binary ready)
 pub struct Speed {
     pub x: f64,
     pub y: f64,

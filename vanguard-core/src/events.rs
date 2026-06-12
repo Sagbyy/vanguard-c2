@@ -1,13 +1,13 @@
 use uuid::Uuid;
-
 pub type PlatformId = Uuid;
 pub type InterceptorId = Uuid;
 pub type ThreatId = Uuid;
+use crate::{DetectedThreat, Position};
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub enum Message {
     ThreatDetected {
-        threat_id: ThreatId,
+        threat: DetectedThreat,
         source_platform: PlatformId,
     },
 
@@ -17,17 +17,12 @@ pub enum Message {
         interceptor_id: InterceptorId,
     },
 
-    PlatformStatus {
-        platform_id: PlatformId,
-        available_interceptors: usize,
-    },
-
     NeighborUpdate {
         platform_id: PlatformId,
-        neighbors: Vec<PlatformId>,
+        position: Position,
+        interceptors_remaining: usize,
     },
 
-    //placeholder
     StrategyUpdate {
         strategy: String,
     },
