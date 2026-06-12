@@ -21,6 +21,7 @@ Système de défense aérienne temps réel (hackathon EDTH) : N intercepteurs pu
 
 ## Conventions de code
 
+- **Minimalisme avant tout** : toujours la solution la plus simple avec le moins de lignes de code possible. Pas d'abstraction spéculative (trait, generic, module) tant qu'il n'y a pas au moins deux usages concrets ; pas de gestion de cas qui n'arrivent pas encore ; pas de dépendance en plus si la lib standard suffit. Contexte hackathon : un code court qui marche bat un code extensible.
 - Rust édition 2024, async avec **tokio** (`#[tokio::main]`, `rt-multi-thread`).
 - Messagerie via **async-nats** + **serde_json**. Sujets NATS à nommer en hiérarchie : `interceptor.<id>.report`, `orchestrator.orders.<id>` (ou équivalent cohérent — vérifier l'existant avant d'en créer).
 - L'orchestrateur fonctionne en **tick** (cible : recalcul toutes les 1–2 s) : `OrchestratorState::tick(reports) -> Vec<(id, InterceptorOrder)>`. Conserver cette séparation pure (état + calcul) / IO (NATS) : la logique d'assignation doit rester testable sans broker.

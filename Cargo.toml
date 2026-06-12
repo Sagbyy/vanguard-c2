@@ -4,5 +4,5 @@ resolver = "3"
 members = [
     "vanguard-core",
     "vanguard-orchestrator",
-    "vanguard-interceptor"
+    "vanguard-system-interceptor",
 ]

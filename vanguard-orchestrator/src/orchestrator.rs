@@ -16,7 +16,7 @@ impl OrchestratorState {
     pub fn tick(
         &mut self,
         reports: &[InterceptorReport],
-    ) -> Vec<(usize, InterceptorOrder)> {
+    ) -> Vec<(Uuid, InterceptorOrder)> {
         self.update(reports);
         self.assign()
     }
@@ -38,7 +38,7 @@ impl OrchestratorState {
         }
     }
 
-    fn assign(&mut self) -> Vec<(usize, InterceptorOrder)> {
+    fn assign(&mut self) -> Vec<(Uuid, InterceptorOrder)> {
         let mut updates = Vec::new();
 
         for interceptor in &mut self.interceptors {

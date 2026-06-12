@@ -9,3 +9,4 @@ pub use interceptor::{
 };
 
 pub use position::Position;
+pub use uuid::Uuid;
