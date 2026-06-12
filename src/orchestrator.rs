@@ -1,8 +1,7 @@
 use crate::models::*;
-use crate::orders::*;
 
 pub struct OrchestratorState {
-    pub threats: Vec<Threat>,
+    pub threats: Vec<DetectedThreat>,
     pub interceptors: Vec<Interceptor>,
 }
 
@@ -17,7 +16,7 @@ impl OrchestratorState {
     pub fn tick(
         &mut self,
         reports: &[InterceptorReport],
-    ) -> Vec<InterceptorCommand> {
+    ) -> Vec<(usize, InterceptorOrder)> {
         self.update(reports);
         self.assign()
     }
@@ -32,61 +31,41 @@ impl OrchestratorState {
                 .find(|i| i.id == report.interceptor_id)
             {
                 interceptor.position = report.position.clone();
+                interceptor.ammo_remaining = report.ammo_remaining;
             }
 
             self.threats.extend(report.threats.iter().cloned());
         }
     }
 
-    fn assign(&self) -> Vec<InterceptorCommand> {
-        let mut commands = Vec::new();
-        let mut used = Vec::new();
+    fn assign(&mut self) -> Vec<(usize, InterceptorOrder)> {
+        let mut updates = Vec::new();
 
-        let mut threats = self.threats.clone();
-
-        threats.sort_by(|a, b| b.threat_level.cmp(&a.threat_level));
-
-        for threat in threats {
-            let interceptor = self
-                .interceptors
+        for interceptor in &mut self.interceptors {
+            let order = self
+                .threats
                 .iter()
-                .filter(|i| {
-                    i.ammo_remaining > 0
-                        && !used.contains(&i.id)
-                })
-                .min_by(|a, b| {
-                    a.position
-                        .distance(&threat.position)
-                        .partial_cmp(
-                            &b.position.distance(&threat.position),
-                        )
-                        .unwrap()
-                });
+                .max_by_key(|t| t.threat_level)
+                .map(|t| InterceptorOrder::Intercept(t.id))
+                .unwrap_or(InterceptorOrder::Idle);
 
-            if let Some(interceptor) = interceptor {
-                used.push(interceptor.id);
-
-                commands.push(InterceptorCommand {
-                    interceptor_id: interceptor.id,
-                    order: Order::InterceptThreat(threat.id),
-                });
+            if interceptor.current_order.as_ref() != Some(&order) {
+                interceptor.current_order = Some(order.clone());
+                updates.push((interceptor.id, order));
             }
         }
 
-        for interceptor in &self.interceptors {
-            if !used.contains(&interceptor.id) {
-                commands.push(InterceptorCommand {
-                    interceptor_id: interceptor.id,
-                    order: Order::Idle,
-                });
-            }
-        }
-
-        commands
+        updates
     }
 
     pub fn display(&self) {
-        println!("Threats: {}", self.threats.len());
-        println!("Interceptors: {}", self.interceptors.len());
+        println!(
+            "Threats: {}",
+            self.threats.len()
+        );
+        println!(
+            "Interceptors: {}",
+            self.interceptors.len()
+        );
     }
 }
