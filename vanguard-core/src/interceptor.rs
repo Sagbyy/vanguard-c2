@@ -1,26 +1,4 @@
-#[derive(Clone, Debug, PartialEq)]
-pub struct Position {
-    pub x: f64,
-    pub y: f64,
-    pub z: f64,
-}
-
-impl Position {
-    pub fn distance(&self, other: &Position) -> f64 {
-        let dx = self.x - other.x;
-        let dy = self.y - other.y;
-        let dz = self.z - other.z;
-
-        (dx * dx + dy * dy + dz * dz).sqrt()
-    }
-}
-
-#[derive(Clone, Debug)]
-pub struct DetectedThreat {
-    pub id: usize,
-    pub position: Position,
-    pub threat_level: usize,
-}
+use position::Position;
 
 #[derive(Clone, Debug)]
 pub struct Interceptor {
@@ -50,4 +28,14 @@ pub struct InterceptorReport {
     pub position: Position,
     pub threats: Vec<DetectedThreat>,
     pub ammo_remaining: usize,
+    pub timestamp: u64
 }
+
+
+#[derive(Clone, Debug)]
+pub struct DetectedThreat {
+    pub id: usize,
+    pub position: Position,
+    pub threat_level: usize,
+}
+

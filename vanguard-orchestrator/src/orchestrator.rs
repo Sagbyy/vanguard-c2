@@ -1,4 +1,4 @@
-use crate::models::*;
+use vanguard-core::*;
 
 pub struct OrchestratorState {
     pub threats: Vec<DetectedThreat>,
