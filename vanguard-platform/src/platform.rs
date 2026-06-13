@@ -188,11 +188,11 @@ impl Platform {
             }
 
             Message::StrategyUpdate { .. } => {}
-
-            // TODO: wire fused tracks + interceptor sync into platform state.
-            Message::TrackUpdated { .. } => {}
-
-            Message::InterceptorUpdate { .. } => {}
+            Message::TrackUpdated { track } => {}
+            Message::InterceptorUpdate {
+                platform_id,
+                interceptor,
+            } => {}
         }
 
         Ok(())
