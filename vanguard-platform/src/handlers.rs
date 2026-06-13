@@ -286,7 +286,7 @@ impl Platform {
                 threat,
                 source_platform: _,
             } => {
-                self.handle_threat_detected(threat);
+                let _ = self.handle_threat_detected(threat);
             }
 
             Message::ThreatDestroyed {
@@ -316,7 +316,7 @@ impl Platform {
 
             Message::StrategyUpdate { .. } => {}
             Message::TrackUpdated { track } => {
-                self.handle_track_updated(track);
+                let _ = self.handle_track_updated(track);
             }
             Message::NewPlatform {
                 platform_id: _,

@@ -3,7 +3,6 @@ mod platform;
 mod state;
 use platform::Platform;
 use state::PlatformState;
-use std::collections::{HashMap, HashSet};
 
 use async_nats::connect;
 use uuid::Uuid;
@@ -38,15 +37,9 @@ async fn main() -> anyhow::Result<()> {
         neighbor_platforms: vec![],
     };
 
-    let state = PlatformState {
-        platform,
-        threats: HashMap::new(),
-        engaged_threats: HashSet::new(),
-        tracks: HashMap::new(),
-        known_interceptors: HashMap::new(),
-    };
+    let state = PlatformState::new(platform);
 
-    let platform = Platform { state, nats };
+    let platform = Platform::new(state, nats);
 
     platform.run().await
 }

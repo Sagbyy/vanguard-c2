@@ -31,9 +31,7 @@ impl InterceptorAgent {
     }
 
     fn update_motion(&mut self) -> Option<Uuid> {
-        let Some(target_id) = self.state.target_id else {
-            return None;
-        };
+        let target_id = self.state.target_id?;
 
         let Some(track) = self.state.tracks.get(&target_id) else {
             println!(

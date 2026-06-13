@@ -57,10 +57,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
 
             Some(msg) = remove_sub.next() => {
-                if let Ok(id) = std::str::from_utf8(&msg.payload).unwrap_or("").parse::<Uuid>() {
-                    if radars.remove(&id).is_some() {
-                        println!("- platform {}", &id.to_string()[..8]);
-                    }
+                if let Ok(id) = std::str::from_utf8(&msg.payload).unwrap_or("").parse::<Uuid>()
+                    && radars.remove(&id).is_some()
+                {
+                    println!("- platform {}", &id.to_string()[..8]);
                 }
             }
 

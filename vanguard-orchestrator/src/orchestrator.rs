@@ -8,9 +8,7 @@ use crate::{
     tracks::{cleanup_tracks, update_track},
 };
 
-use vanguard_core::{
-    Assignment, Message, NeighborPlatform, interceptor::TrackStatus, subjects::*,
-};
+use vanguard_core::{Assignment, Message, NeighborPlatform, interceptor::TrackStatus, subjects::*};
 
 pub struct Orchestrator {
     pub state: OrchestratorState,
@@ -26,7 +24,7 @@ impl Orchestrator {
     }
 
     async fn publish(&self, subject: &'static str, msg: Message) -> Result<()> {
-        println!("[{}] PUB {} {:?}", "Orchestrator", subject, msg);
+        println!("[Orchestrator] PUB {subject} {msg:?}");
         self.nats
             .publish(subject, serde_json::to_vec(&msg)?.into())
             .await?;
@@ -152,8 +150,8 @@ impl Orchestrator {
             .state
             .platforms
             .values()
+            .filter(|other| other.position.distance(&position) <= other.reach + reach)
             .cloned()
-            .filter(|other| other.position.distance(&position) <= (other.reach + reach) as f64)
             .collect();
 
         self.state.platforms.insert(

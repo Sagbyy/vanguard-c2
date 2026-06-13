@@ -105,7 +105,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             !reached
         });
 
-        if ticks % PUBLISH_EVERY_TICKS == 0 {
+        if ticks.is_multiple_of(PUBLISH_EVERY_TICKS) {
             let threats: Vec<&Threat> = actives.iter().map(|a| &a.threat).collect();
             let payload = serde_json::to_vec(&threats)?;
             client.publish(THREATS_SUBJECT, payload.into()).await?;
