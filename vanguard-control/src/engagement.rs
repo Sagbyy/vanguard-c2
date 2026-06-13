@@ -1,5 +1,6 @@
 //! Engagement layer: assigns platforms to confirmed real threats (Hungarian),
-//! then flies a real interceptor to a predicted intercept point until impact.
+//! then flies real interceptors to predicted intercept points until impact.
+//! A platform can have several interceptors in flight at once (salvo).
 
 use std::collections::{HashMap, HashSet};
 
@@ -12,6 +13,8 @@ use vanguard_core::{Engagement, FlyingInterceptor, Position, Radar, Speed, Threa
 const INTERCEPTOR_SPEED: f64 = 800.0;
 /// Detonation radius: within this of the target (or reachable this tick) = kill.
 const HIT_RADIUS: f64 = 400.0;
+/// Max interceptors a single platform can keep in flight simultaneously.
+const MAX_IN_FLIGHT: usize = 3;
 /// Score floor: any reachable target outranks "don't fire" (dummy = 0).
 const REACHABLE_BASE: i64 = 100_000;
 const UNREACHABLE: i64 = -1_000_000;
@@ -24,7 +27,7 @@ struct Shot {
 
 struct Engager {
     ammo: usize,
-    shot: Option<Shot>,
+    shots: Vec<Shot>,
 }
 
 #[derive(Default)]
@@ -47,7 +50,7 @@ impl Engagements {
         for (id, radar) in radars {
             self.engagers.entry(*id).or_insert(Engager {
                 ammo: radar.spec().ammo,
-                shot: None,
+                shots: Vec::new(),
             });
         }
     }
@@ -83,29 +86,28 @@ impl Engagements {
         self.last_pos = threats.iter().map(|t| (t.id, t.position.clone())).collect();
 
         let by_id: HashMap<Uuid, &Threat> = threats.iter().map(|t| (t.id, t)).collect();
-        // Interceptor speed scaled the same as the (accelerated) threats, so the
+        // Interceptor speed scaled like the (accelerated) threats so the
         // predicted-intercept geometry stays consistent at any time scale.
         let int_speed = INTERCEPTOR_SPEED * time_scale.max(0.0);
         let step = int_speed * dt;
 
-        // Fly in-flight interceptors toward their predicted intercept point.
+        // Fly every in-flight interceptor; drop those that impacted or lost their target.
         let mut destroyed = Vec::new();
         for eng in self.engagers.values_mut() {
-            let Some(shot) = &mut eng.shot else { continue };
-            let Some(threat) = by_id.get(&shot.target) else {
-                eng.shot = None; // target gone (leaked / already killed)
-                continue;
-            };
-            let v = vel.get(&shot.target).cloned().unwrap_or(Speed { x: 0.0, y: 0.0 });
-
-            if shot.position.distance(&threat.position) <= step + HIT_RADIUS {
-                destroyed.push(shot.target); // impact this tick
-                eng.shot = None;
-                continue;
-            }
-            let aim = predicted_intercept(&shot.position, int_speed, &threat.position, &v)
-                .unwrap_or_else(|| threat.position.clone()); // fallback: pure pursuit
-            shot.position = shot.position.step_toward(&aim, step);
+            eng.shots.retain_mut(|shot| {
+                let Some(threat) = by_id.get(&shot.target) else {
+                    return false; // target gone (leaked / already killed)
+                };
+                if shot.position.distance(&threat.position) <= step + HIT_RADIUS {
+                    destroyed.push(shot.target); // impact this tick
+                    return false;
+                }
+                let v = vel.get(&shot.target).cloned().unwrap_or(Speed { x: 0.0, y: 0.0 });
+                let aim = predicted_intercept(&shot.position, int_speed, &threat.position, &v)
+                    .unwrap_or_else(|| threat.position.clone()); // fallback: pure pursuit
+                shot.position = shot.position.step_toward(&aim, step);
+                true
+            });
         }
         self.neutralized += destroyed.len();
 
@@ -113,41 +115,43 @@ impl Engagements {
         destroyed
     }
 
-    /// Hungarian assignment: globally optimal platform → target matching, then
-    /// launch an interceptor from each newly-assigned platform.
+    /// Hungarian assignment over free *tubes* (a platform offers up to
+    /// MAX_IN_FLIGHT − in-flight, capped by ammo) × confirmed-real targets.
     fn assign(&mut self, radars: &HashMap<Uuid, Radar>, threats: &[Threat], engageable: &HashSet<Uuid>) {
         let targeted: HashSet<Uuid> = self
             .engagers
             .values()
-            .filter_map(|e| e.shot.as_ref().map(|s| s.target))
+            .flat_map(|e| e.shots.iter().map(|s| s.target))
             .collect();
 
-        let free: Vec<Uuid> = self
-            .engagers
-            .iter()
-            .filter(|(_, e)| e.shot.is_none() && e.ammo > 0)
-            .map(|(id, _)| *id)
-            .collect();
+        // One entry per free tube (a platform may appear several times).
+        let mut tubes: Vec<Uuid> = Vec::new();
+        for (pid, e) in &self.engagers {
+            let capacity = MAX_IN_FLIGHT.saturating_sub(e.shots.len()).min(e.ammo);
+            for _ in 0..capacity {
+                tubes.push(*pid);
+            }
+        }
         let targets: Vec<&Threat> = threats
             .iter()
             .filter(|t| engageable.contains(&t.id) && !targeted.contains(&t.id))
             .collect();
-        if free.is_empty() || targets.is_empty() {
+        if tubes.is_empty() || targets.is_empty() {
             return;
         }
 
-        let n = free.len().max(targets.len());
+        let n = tubes.len().max(targets.len());
         let rows: Vec<Vec<i64>> = (0..n)
             .map(|i| {
                 (0..n)
-                    .map(|j| self.score(radars, free.get(i), targets.get(j).copied()))
+                    .map(|j| self.score(radars, tubes.get(i), targets.get(j).copied()))
                     .collect()
             })
             .collect();
         let (_, assignment) = kuhn_munkres(&Matrix::from_rows(rows).expect("square matrix"));
 
         for (i, &j) in assignment.iter().enumerate() {
-            let (Some(&pid), Some(&t)) = (free.get(i), targets.get(j)) else {
+            let (Some(&pid), Some(&t)) = (tubes.get(i), targets.get(j)) else {
                 continue;
             };
             let Some(radar) = radars.get(&pid) else { continue };
@@ -155,7 +159,10 @@ impl Engagements {
                 continue; // dummy / out-of-range match
             }
             if let Some(eng) = self.engagers.get_mut(&pid) {
-                eng.shot = Some(Shot {
+                if eng.ammo == 0 {
+                    continue;
+                }
+                eng.shots.push(Shot {
                     id: Uuid::new_v4(),
                     target: t.id,
                     position: radar.spec().position.clone(),
@@ -183,12 +190,12 @@ impl Engagements {
         self.engagers.get(platform_id).map_or(0, |e| e.ammo)
     }
 
-    /// Firing lines (platform → its target) for the operator view.
+    /// Firing lines (platform → each engaged target) for the operator view.
     pub fn lines(&self) -> Vec<Engagement> {
         self.engagers
             .iter()
-            .filter_map(|(pid, e)| {
-                e.shot.as_ref().map(|s| Engagement {
+            .flat_map(|(pid, e)| {
+                e.shots.iter().map(move |s| Engagement {
                     platform_id: *pid,
                     threat_id: s.target,
                 })
@@ -200,8 +207,8 @@ impl Engagements {
     pub fn interceptors(&self) -> Vec<FlyingInterceptor> {
         self.engagers
             .values()
-            .filter_map(|e| {
-                e.shot.as_ref().map(|s| FlyingInterceptor {
+            .flat_map(|e| {
+                e.shots.iter().map(|s| FlyingInterceptor {
                     id: s.id,
                     position: s.position.clone(),
                     target_id: s.target,
