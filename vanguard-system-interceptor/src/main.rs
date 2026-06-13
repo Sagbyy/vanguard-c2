@@ -8,12 +8,14 @@ use futures::StreamExt;
 use uuid::Uuid;
 use vanguard_core::{
     DetectedThreat, Interceptor, InterceptorReport, InterceptorState, PlatformInterceptor,
-    Position, Speed, THREATS_SUBJECT, Threat, report_subject,
+    Position, Speed, THREATS_SUBJECT, Threat, ThreatClassification, report_subject,
 };
 
 use crate::cli::Args;
 
-const DETECTION_RANGE: f64 = 1_500.0;
+const DETECTION_RANGE: f64 = 20_000.0; // ground radar vs low-flying targets
+// Above this speed a contact is classified as a cruise-missile-class fast mover.
+const MISSILE_SPEED: f64 = 300.0;
 const DEFAULT_NATS_URL: &str = "nats://127.0.0.1:4222";
 
 #[tokio::main]
@@ -29,6 +31,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             id: Uuid::new_v4(),
             position: position.clone(),
             state: InterceptorState::Idle,
+            assigned_track: None,
         })
         .collect();
 
@@ -76,6 +79,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         };
 
         let now = Instant::now();
+        let now_ms = unix_timestamp_ms();
         let mut contacts: Vec<DetectedThreat> = Vec::new();
         let mut in_range = Vec::new();
 
@@ -108,11 +112,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             };
             last_seen.insert(threat.id, (threat.position.clone(), now));
 
+            let classification = if threat.speed >= MISSILE_SPEED {
+                ThreatClassification::CruiseMissile
+            } else {
+                ThreatClassification::Drone
+            };
             contacts.push(DetectedThreat {
                 id: threat.id,
                 position: threat.position.clone(),
                 speed,
                 threat_level: threat.threat_level,
+                classification,
+                confidence: 0.9,
+                detected_at: now_ms as f64 / 1000.0,
             });
             in_range.push(format!("{} at {:.0} m", short(&threat.id), range));
         }
@@ -125,6 +137,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         let report = InterceptorReport {
             platform_id: platform.id,
+            name: platform.name.clone(),
+            position: platform.position.clone(),
+            range: platform.range,
             threats: contacts,
             interceptors_remaining: platform
                 .interceptors

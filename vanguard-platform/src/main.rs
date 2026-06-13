@@ -25,11 +25,13 @@ async fn main() -> anyhow::Result<()> {
                 id: Uuid::new_v4(),
                 position: Position { x: 0.0, y: 0.0 },
                 state: InterceptorState::Idle,
+                assigned_track: None,
             },
             Interceptor {
                 id: Uuid::new_v4(),
                 position: Position { x: 0.0, y: 0.0 },
                 state: InterceptorState::Idle,
+                assigned_track: None,
             },
         ],
 

@@ -188,6 +188,11 @@ impl Platform {
             }
 
             Message::StrategyUpdate { .. } => {}
+
+            // TODO: wire fused tracks + interceptor sync into platform state.
+            Message::TrackUpdated { .. } => {}
+
+            Message::InterceptorUpdate { .. } => {}
         }
 
         Ok(())
@@ -280,6 +285,7 @@ mod tests {
                 id: Uuid::new_v4(),
                 position: Position { x: 0.0, y: 0.0 },
                 state: InterceptorState::Idle,
+                assigned_track: None,
             }],
             neighbor_platforms: vec![NeighborPlatform {
                 id: Uuid::new_v4(),

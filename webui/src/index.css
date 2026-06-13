@@ -1,0 +1,161 @@
+@import "tailwindcss";
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: #04070b;
+  color: #c9d8e2;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+/* ——— Map markers (MapLibre custom elements) ——— */
+
+.marker-tip {
+  display: none;
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  padding: 5px 8px;
+  font-size: 11px;
+  color: #c9d8e2;
+  background: rgba(4, 11, 16, 0.94);
+  border: 1px solid #39d5ff;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.platform-marker:hover .marker-tip,
+.threat-marker:hover .marker-tip {
+  display: block;
+}
+
+.platform-marker {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  cursor: crosshair;
+}
+
+.platform-marker.stale {
+  opacity: 0.35;
+}
+
+.platform-icon {
+  width: 0;
+  height: 0;
+  border-left: 8px solid transparent;
+  border-right: 8px solid transparent;
+  border-bottom: 14px solid #35f0a8;
+  filter: drop-shadow(0 0 6px rgba(53, 240, 168, 0.7));
+}
+
+.platform-label {
+  margin-top: 2px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  color: #35f0a8;
+  text-shadow: 0 0 4px rgba(0, 0, 0, 0.9);
+}
+
+.threat-marker {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  cursor: crosshair;
+}
+
+.threat-dot {
+  border-radius: 9999px;
+}
+
+.threat-marker.tracked .threat-dot {
+  outline: 1.5px solid #39d5ff;
+  outline-offset: 4px;
+}
+
+.threat-label {
+  margin-top: 3px;
+  font-size: 9px;
+  color: #8aa3b5;
+  text-shadow: 0 0 4px rgba(0, 0, 0, 0.9);
+}
+
+.asset-marker {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.asset-core {
+  width: 14px;
+  height: 14px;
+  background: #39d5ff;
+  transform: rotate(45deg);
+  box-shadow: 0 0 12px 3px rgba(57, 213, 255, 0.6);
+}
+
+.asset-pulse {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 14px;
+  height: 14px;
+  border: 1.5px solid #39d5ff;
+  border-radius: 9999px;
+  transform: translate(-50%, -50%);
+  animation: asset-pulse 2s ease-out infinite;
+}
+
+@keyframes asset-pulse {
+  from {
+    width: 14px;
+    height: 14px;
+    opacity: 0.9;
+  }
+  to {
+    width: 90px;
+    height: 90px;
+    opacity: 0;
+  }
+}
+
+.asset-label {
+  margin-top: 10px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  color: #39d5ff;
+  text-shadow: 0 0 4px rgba(0, 0, 0, 0.9);
+  white-space: nowrap;
+}
+
+/* MapLibre chrome, re-themed dark */
+.maplibregl-ctrl-attrib {
+  background: rgba(4, 11, 16, 0.7) !important;
+  color: #56788c;
+  font-size: 9px;
+}
+
+.maplibregl-ctrl-attrib a {
+  color: #56788c;
+}
+
+.maplibregl-ctrl-group {
+  background: #0a1118 !important;
+  border: 1px solid rgba(57, 213, 255, 0.2);
+}
+
+.maplibregl-ctrl-group button span {
+  filter: invert(0.8);
+}

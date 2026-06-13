@@ -40,8 +40,11 @@ pub enum InterceptorState {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct InterceptorReport {
     pub platform_id: Uuid,
+    pub name: String,
+    pub position: Position,
+    pub range: f64,
     pub threats: Vec<DetectedThreat>,
-    pub interceptors: Vec<Interceptor>,
+    pub interceptors_remaining: usize,
     pub timestamp: u64,
 }
 

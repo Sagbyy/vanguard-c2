@@ -5,13 +5,12 @@ use rand::{Rng, SeedableRng};
 use uuid::Uuid;
 use vanguard_core::{Position, THREATS_SUBJECT, Threat};
 
-const WORLD_RADIUS: f64 = 5_000.0;
+const WORLD_RADIUS: f64 = 50_000.0; // ingress ring, well outside every radar bubble
 const TICK: std::time::Duration = std::time::Duration::from_millis(500);
-const SPAWN_EVERY_TICKS: u64 = 6; // one threat every 3 s
+const SPAWN_EVERY_TICKS: u64 = 24; // one threat every 12 s
 const PUBLISH_EVERY_TICKS: u64 = 2; // ground truth published every second
-const THREAT_SPEED: std::ops::Range<f64> = 30.0..80.0;
-const THREAT_LEVEL: std::ops::Range<usize> = 1..6;
-const IMPACT_RADIUS: f64 = 10.0;
+const MAX_ACTIVE_THREATS: usize = 24; // saturation cap, keeps the raid readable
+const IMPACT_RADIUS: f64 = 50.0;
 const SEED: u64 = 42;
 const DEFAULT_NATS_URL: &str = "nats://127.0.0.1:4222";
 
@@ -32,7 +31,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         ticker.tick().await;
         let t = tick as f64 * dt;
 
-        if tick % SPAWN_EVERY_TICKS == 0 {
+        if tick % SPAWN_EVERY_TICKS == 0 && threats.len() < MAX_ACTIVE_THREATS {
             let threat = spawn_threat(&mut rng);
             println!(
                 "[{t:6.1}s] threat {} spawned at ({:.0}, {:.0}) — {:.0} m/s, level {}",
@@ -79,14 +78,25 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 fn spawn_threat(rng: &mut StdRng) -> Threat {
     let angle = rng.gen_range(0.0..TAU);
+    // Realistic raid mix: mostly Shahed/Geran-class loitering munitions —
+    // 180 km/h (classic Shahed-136 cruise) up to 300 km/h (modernized
+    // Geran-2 variants) — plus some cruise-missile-class fast movers
+    // (~800-950 km/h, Kalibr/Kh-101 class).
+    // Speeds doubled on purpose for demo pacing.
+    let (speed, threat_level) = if rng.gen_bool(0.7) {
+        (rng.gen_range(100.0..170.0), rng.gen_range(2..5))
+    } else {
+        (rng.gen_range(440.0..530.0), rng.gen_range(4..6))
+    };
+
     Threat {
         id: Uuid::new_v4(),
         position: Position {
             x: WORLD_RADIUS * angle.cos(),
             y: WORLD_RADIUS * angle.sin(),
         },
-        speed: rng.gen_range(THREAT_SPEED),
-        threat_level: rng.gen_range(THREAT_LEVEL),
+        speed,
+        threat_level,
     }
 }
 
