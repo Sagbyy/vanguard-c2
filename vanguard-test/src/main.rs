@@ -27,12 +27,9 @@ async fn main() -> Result<()> {
         name: "Alpha".to_string(),
         position: Position { x: 0.0, y: 0.0 },
         reach: 250.0,
-        interceptors: vec![Interceptor {
-            id: Uuid::new_v4(),
-            position: Position { x: 0.0, y: 0.0 },
-            state: InterceptorState::Idle,
-            assigned_track: None,
-        }],
+        interceptors: (0..5)
+            .map(|_| interceptor(Position { x: 0.0, y: 0.0 }))
+            .collect(),
         neighbor_platforms: vec![],
     };
 
@@ -41,12 +38,9 @@ async fn main() -> Result<()> {
         name: "Bravo".to_string(),
         position: Position { x: 600.0, y: 0.0 },
         reach: 350.0,
-        interceptors: vec![Interceptor {
-            id: Uuid::new_v4(),
-            position: Position { x: 600.0, y: 0.0 },
-            state: InterceptorState::Idle,
-            assigned_track: None,
-        }],
+        interceptors: (0..5)
+            .map(|_| interceptor(Position { x: 600.0, y: 0.0 }))
+            .collect(),
         neighbor_platforms: vec![],
     };
 
@@ -89,5 +83,14 @@ async fn main() -> Result<()> {
             .await?;
 
         sleep(Duration::from_secs(1)).await;
+    }
+}
+
+fn interceptor(position: Position) -> Interceptor {
+    Interceptor {
+        id: Uuid::new_v4(),
+        position,
+        state: InterceptorState::Idle,
+        assigned_track: None,
     }
 }
