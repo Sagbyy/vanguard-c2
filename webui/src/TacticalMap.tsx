@@ -29,6 +29,8 @@ interface TacticalMapProps {
   interceptors: { id: string; position: Position }[]
   /** Impact bursts to play once (kill = cyan, real impact = red). */
   bursts: { key: number; position: Position; kind: 'kill' | 'impact' }[]
+  /** Defended-zone radius in metres (follows the config slider). */
+  zoneRadius: number
 }
 
 const BASE_STYLE: StyleSpecification = {
@@ -71,8 +73,6 @@ const CATEGORY_COLOR = {
   decoy: '#8aa3b5', // grey
 } as const
 
-// Defended zone radius (m) — mirrors DEFENDED_ZONE_RADIUS in vanguard-map.
-const DEFENDED_ZONE_RADIUS = 6_000
 
 export function TacticalMap({
   threats,
@@ -85,6 +85,7 @@ export function TacticalMap({
   engagements,
   interceptors,
   bursts,
+  zoneRadius,
 }: TacticalMapProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<maplibregl.Map | null>(null)
@@ -131,23 +132,8 @@ export function TacticalMap({
     })
 
     map.on('load', () => {
-      // Defended zone — where threats aim (random impact points across the city).
-      map.addSource('zone', {
-        type: 'geojson',
-        data: {
-          type: 'FeatureCollection',
-          features: [
-            {
-              type: 'Feature',
-              geometry: {
-                type: 'Polygon',
-                coordinates: [rangeRing({ x: 0, y: 0 }, DEFENDED_ZONE_RADIUS)],
-              },
-              properties: {},
-            },
-          ],
-        },
-      })
+      // Defended zone — where threats aim. Radius set by an effect (config slider).
+      map.addSource('zone', { type: 'geojson', data: empty() })
       map.addLayer({
         id: 'zone-fill',
         type: 'fill',
@@ -278,6 +264,19 @@ export function TacticalMap({
     map.setLayoutProperty('satellite', 'visibility', sat ? 'visible' : 'none')
     map.setLayoutProperty('sat-dim', 'visibility', sat ? 'visible' : 'none')
   }, [basemap, ready])
+
+  // Defended-zone circle follows the config slider.
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !ready) return
+    setSource(map, 'zone', [
+      {
+        type: 'Feature',
+        geometry: { type: 'Polygon', coordinates: [rangeRing({ x: 0, y: 0 }, zoneRadius)] },
+        properties: {},
+      },
+    ])
+  }, [zoneRadius, ready])
 
   // Register only bursts not yet played (key strictly above the last seen),
   // so re-renders of the capped `bursts` array don't replay old ones.

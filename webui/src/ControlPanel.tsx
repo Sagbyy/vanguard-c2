@@ -19,6 +19,8 @@ interface ControlPanelProps {
   clearPending: () => void
   /** Reported live so the map can preview the reach ring (metres). */
   onReachChange: (reachM: number) => void
+  /** Reported live so the map can draw the defended zone (metres). */
+  onZoneRadiusChange: (zoneM: number) => void
 }
 
 function Slider({
@@ -67,6 +69,7 @@ export function ControlPanel({
   pending,
   clearPending,
   onReachChange,
+  onZoneRadiusChange,
 }: ControlPanelProps) {
   const [cfg, setCfg] = useState<MapConfig>(DEFAULT_MAP_CONFIG)
   const [name, setName] = useState('site')
@@ -77,6 +80,11 @@ export function ControlPanel({
   useEffect(() => {
     onReachChange(reachKm * 1000)
   }, [reachKm, onReachChange])
+
+  // Keep the map's defended-zone circle in sync with the slider.
+  useEffect(() => {
+    onZoneRadiusChange(cfg.zone_radius)
+  }, [cfg.zone_radius, onZoneRadiusChange])
 
   const pushConfig = (next: MapConfig) => {
     setCfg(next)

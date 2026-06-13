@@ -144,7 +144,7 @@ fn preset_radars(classification_range: f64) -> HashMap<Uuid, Radar> {
         .collect()
 }
 
-/// Default Kyiv deployment: long-range ring + short-range in-city point defence.
+/// Default Kyiv deployment: long-range ring around the city (all 20 km reach).
 fn kyiv_preset() -> Vec<PlatformSpec> {
     let ring = [
         ("hostomel", -18600.0, 14800.0),
@@ -153,19 +153,11 @@ fn kyiv_preset() -> Vec<PlatformSpec> {
         ("boryspil", 30200.0, -11700.0),
         ("vyshhorod", 1000.0, 19000.0),
         ("obukhiv", 6000.0, -28000.0),
-    ];
-    let city = [
-        ("maidan", 0.0, 0.0),
-        ("livoberezhna", 6000.0, -1500.0),
         ("sviatoshyn", -9000.0, 2000.0),
     ];
 
     ring.iter()
         .map(|&(name, x, y)| spec(name, x, y, 20_000.0, 6))
-        .chain(
-            city.iter()
-                .map(|&(name, x, y)| spec(name, x, y, 7_000.0, 4)),
-        )
         .collect()
 }
 

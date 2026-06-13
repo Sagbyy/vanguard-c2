@@ -109,6 +109,7 @@ export default function App() {
   const [placing, setPlacing] = useState(false)
   const [pending, setPending] = useState<Position | null>(null)
   const [previewReach, setPreviewReach] = useState(15_000)
+  const [zoneRadius, setZoneRadius] = useState(6_000)
 
   const categoryOf = (threat: Threat): TrackCategory =>
     trackCategory(classifications.get(threat.id) ?? 'Unknown')
@@ -195,6 +196,7 @@ export default function App() {
             engagements={engagements.lines}
             interceptors={interceptors}
             bursts={bursts}
+            zoneRadius={zoneRadius}
           />
         </main>
 
@@ -209,6 +211,7 @@ export default function App() {
             pending={pending}
             clearPending={() => setPending(null)}
             onReachChange={setPreviewReach}
+            onZoneRadiusChange={setZoneRadius}
           />
 
           <section>
