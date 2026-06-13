@@ -21,14 +21,15 @@ pub struct NeighborPlatform {
 }
 
 // possibilité: étendre le lien par la suite
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Interceptor {
     pub id: Uuid,
     pub position: Position,
     pub state: InterceptorState,
+    pub assigned_track: Option<Uuid>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum InterceptorState {
     Idle,
     MovingTo(Position),
@@ -40,7 +41,7 @@ pub enum InterceptorState {
 pub struct InterceptorReport {
     pub platform_id: Uuid,
     pub threats: Vec<DetectedThreat>,
-    pub interceptors_remaining: usize,
+    pub interceptors: Vec<Interceptor>,
     pub timestamp: u64,
 }
 
@@ -66,4 +67,15 @@ pub enum ThreatClassification {
     BallisticMissile,
     Friendly,
     Civilian,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ThreatTrack {
+    pub track_id: Uuid,
+    pub position: Position,
+    pub velocity: Speed,
+    pub confidence: f64,
+    pub threat_level: usize,
+    pub last_update: f64,
+    pub source_platforms: Vec<Uuid>,
 }

@@ -3,10 +3,10 @@ pub mod interceptor;
 pub mod position;
 pub mod threat;
 
-pub use events::Message;
+pub use events::{Assignment, Message};
 pub use interceptor::{
     DetectedThreat, Interceptor, InterceptorReport, InterceptorState, NeighborPlatform,
-    PlatformInterceptor,
+    PlatformInterceptor, ThreatTrack,
 };
 pub use position::{Position, Speed};
 pub use threat::Threat;

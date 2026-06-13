@@ -2,7 +2,7 @@ use uuid::Uuid;
 pub type PlatformId = Uuid;
 pub type InterceptorId = Uuid;
 pub type ThreatId = Uuid;
-use crate::{DetectedThreat, Position};
+use crate::{DetectedThreat, Interceptor, Position, ThreatTrack};
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub enum Message {
@@ -24,6 +24,22 @@ pub enum Message {
     },
 
     StrategyUpdate {
-        strategy: String,
+        assignments: Vec<Assignment>,
     },
+
+    TrackUpdated {
+        track: ThreatTrack,
+    },
+
+    InterceptorUpdate {
+        platform_id: PlatformId,
+        interceptor: Interceptor,
+    },
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct Assignment {
+    pub platform_id: Uuid,
+    pub interceptor_id: Uuid,
+    pub track_id: Uuid,
 }

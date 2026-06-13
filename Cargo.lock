@@ -1575,10 +1575,13 @@ dependencies = [
 name = "vanguard-orchestrator"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "async-nats",
  "futures",
+ "serde",
  "serde_json",
  "tokio",
+ "uuid",
  "vanguard-core",
 ]
 
