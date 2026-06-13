@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { TacticalMap } from './TacticalMap'
-import { STALE_AFTER_MS, type PlatformView, type Threat } from './types'
+import { REMOVE_AFTER_MS, STALE_AFTER_MS, type PlatformView, type Threat } from './types'
 import { useNats, type ConnectionStatus } from './useNats'
 
 const STATUS_STYLE: Record<ConnectionStatus, { label: string; dot: string; text: string }> = {
@@ -80,8 +80,11 @@ export default function App() {
   }, [])
 
   const platformList = useMemo(
-    () => [...platforms.values()].sort((a, b) => a.report.name.localeCompare(b.report.name)),
-    [platforms],
+    () =>
+      [...platforms.values()]
+        .filter((view) => now - view.lastSeen < REMOVE_AFTER_MS)
+        .sort((a, b) => a.report.name.localeCompare(b.report.name)),
+    [platforms, now],
   )
   const sortedThreats = useMemo(
     () =>

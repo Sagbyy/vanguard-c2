@@ -44,3 +44,5 @@ export interface PlatformView {
 }
 
 export const STALE_AFTER_MS = 5_000
+/** A platform silent for this long is removed from the picture entirely. */
+export const REMOVE_AFTER_MS = 30_000

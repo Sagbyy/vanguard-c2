@@ -57,7 +57,7 @@ export function TacticalMap({ threats, platforms }: TacticalMapProps) {
       container,
       style: DARK_BASEMAP,
       center: KYIV,
-      zoom: 8.6,
+      zoom: 8.2,
     })
     mapRef.current = map
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-left')
