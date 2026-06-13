@@ -8,24 +8,18 @@ use crate::interceptor::{DetectedThreat, InterceptorReport, ThreatClassification
 use crate::position::{Position, Speed};
 use crate::threat::Threat;
 
-const MISSILE_SPEED: f64 = 300.0;
-
-/// One platform's sensor: detects threats within `reach`, estimates their
-/// velocity from successive sightings, and can only tell a real drone from a
-/// decoy once the contact is within `classification_range`.
+/// One platform's sensor: detects threats within `reach` and estimates their
+/// velocity from successive sightings. It does NOT tell a real drone from a
+/// decoy — that recognition is done by the interceptor's seeker in terminal
+/// flight (see `vanguard-control`). Every contact is reported as `Unknown`.
 pub struct Radar {
     spec: PlatformSpec,
-    classification_range: f64,
     last_seen: HashMap<Uuid, (Position, Instant)>,
 }
 
 impl Radar {
-    pub fn new(spec: PlatformSpec, classification_range: f64) -> Self {
-        Self {
-            spec,
-            classification_range,
-            last_seen: HashMap::new(),
-        }
+    pub fn new(spec: PlatformSpec) -> Self {
+        Self { spec, last_seen: HashMap::new() }
     }
 
     pub fn spec(&self) -> &PlatformSpec {
@@ -56,26 +50,13 @@ impl Radar {
             self.last_seen
                 .insert(threat.id, (threat.position.clone(), now));
 
-            let (classification, confidence) = if range <= self.classification_range {
-                let class = if threat.is_decoy {
-                    ThreatClassification::Decoy
-                } else if threat.speed >= MISSILE_SPEED {
-                    ThreatClassification::CruiseMissile
-                } else {
-                    ThreatClassification::Drone
-                };
-                (class, 0.95)
-            } else {
-                (ThreatClassification::Unknown, 0.3)
-            };
-
             contacts.push(DetectedThreat {
                 id: threat.id,
                 position: threat.position.clone(),
                 speed,
                 threat_level: threat.threat_level,
-                classification,
-                confidence,
+                classification: ThreatClassification::Unknown,
+                confidence: 0.3,
                 detected_at: now_ms as f64 / 1000.0,
             });
         }

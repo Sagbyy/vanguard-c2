@@ -15,23 +15,19 @@ use vanguard_core::{
     ThreatDestroyed, report_subject,
 };
 
-use crate::engagement::{Engagements, SAFE_ZONE};
+use crate::engagement::{Engagements, SAFE_ZONES};
 
 const DEFAULT_NATS_URL: &str = "nats://127.0.0.1:4222";
-const CLASSIFICATION_RANGE: f64 = 8_000.0;
-
-/// True when a contact's classification marks a confirmed real threat to engage.
-fn is_real(class: &ThreatClassification) -> bool {
-    !matches!(class, ThreatClassification::Decoy | ThreatClassification::Unknown)
-}
+/// Distance at which an interceptor's seeker recognises real-vs-decoy (terminal).
+const RECOGNITION_RANGE: f64 = 4_000.0;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let nats_url = std::env::var("NATS_URL").unwrap_or_else(|_| DEFAULT_NATS_URL.to_string());
-    let classification_range = std::env::var("CLASSIFICATION_RANGE_M")
+    let recognition_range = std::env::var("RECOGNITION_RANGE_M")
         .ok()
         .and_then(|v| v.parse().ok())
-        .unwrap_or(CLASSIFICATION_RANGE);
+        .unwrap_or(RECOGNITION_RANGE);
     let client = async_nats::connect(&nats_url).await?;
     let mut threats_sub = client.subscribe(THREATS_SUBJECT).await?;
     let mut add_sub = client.subscribe(PLATFORM_ADD).await?;
@@ -42,7 +38,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut abort_sub = client.subscribe(INTERCEPTOR_ABORT).await?;
     println!("control host online via {nats_url}");
 
-    let mut radars = preset_radars(classification_range);
+    let mut radars = preset_radars();
     let mut engagements = Engagements::default();
     let mut last_ms = 0u64;
     let mut time_scale = 1.0_f64;
@@ -66,13 +62,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 last_ms = now_ms;
                 engagements.sync(&radars);
 
-                // Radar reports + the set of confirmed-real (engageable) threats.
+                // Radar reports: platforms only DETECT (contacts stay Unknown).
+                // We stamp the seeker's recognition (interceptor-side) on each
+                // contact so the dashboard colours real/decoy, and build the
+                // engageable set = every detected contact except confirmed decoys.
+                let recognized = engagements.recognized().clone();
                 let mut engageable: HashSet<Uuid> = HashSet::new();
                 for (id, radar) in radars.iter_mut() {
                     let mut report = radar.observe(&threats, now_ms);
                     report.interceptors_remaining = engagements.ammo(id);
-                    for contact in &report.threats {
-                        if is_real(&contact.classification) {
+                    for contact in &mut report.threats {
+                        if let Some(class) = recognized.get(&contact.id) {
+                            contact.classification = class.clone();
+                        }
+                        let is_decoy = matches!(recognized.get(&contact.id), Some(ThreatClassification::Decoy));
+                        if !is_decoy {
                             engageable.insert(contact.id);
                         }
                     }
@@ -81,9 +85,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
                 }
 
-                // Fly interceptors, resolve impacts, assign new shots.
+                // Fly interceptors, recognise, resolve impacts, assign new shots.
                 let by_id: HashMap<Uuid, &Threat> = threats.iter().map(|t| (t.id, t)).collect();
-                for tid in engagements.step(&radars, &threats, &engageable, dt, time_scale) {
+                for tid in engagements.step(&radars, &threats, &engageable, dt, time_scale, recognition_range) {
                     println!("NEUTRALIZED {} (total {})", &tid.to_string()[..8], engagements.neutralized);
                     let position = by_id.get(&tid).map(|t| t.position.clone()).unwrap_or(Position { x: 0.0, y: 0.0 });
                     let event = ThreatDestroyed { id: tid, position };
@@ -96,7 +100,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let report = EngagementReport {
                     lines: engagements.lines(),
                     neutralized: engagements.neutralized,
-                    safe_zone: SAFE_ZONE,
+                    safe_zones: SAFE_ZONES.to_vec(),
                 };
                 if let Ok(payload) = serde_json::to_vec(&report) {
                     let _ = client.publish(ENGAGEMENTS, payload.into()).await;
@@ -110,7 +114,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 match serde_json::from_slice::<PlatformSpec>(&msg.payload) {
                     Ok(spec) => {
                         println!("+ platform {} at ({:.0}, {:.0}) reach {:.0}", spec.name, spec.position.x, spec.position.y, spec.reach);
-                        radars.insert(spec.id, Radar::new(spec, classification_range));
+                        radars.insert(spec.id, Radar::new(spec));
                     }
                     Err(error) => eprintln!("invalid platform spec: {error}"),
                 }
@@ -144,7 +148,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             Some(_) = reset_sub.next() => {
                 println!("reset — restoring Kyiv preset");
-                radars = preset_radars(classification_range);
+                radars = preset_radars();
                 engagements.reset();
                 time_scale = 1.0;
             }
@@ -153,10 +157,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 /// Builds the radars for the default Kyiv deployment.
-fn preset_radars(classification_range: f64) -> HashMap<Uuid, Radar> {
+fn preset_radars() -> HashMap<Uuid, Radar> {
     kyiv_preset()
         .into_iter()
-        .map(|spec| (spec.id, Radar::new(spec, classification_range)))
+        .map(|spec| (spec.id, Radar::new(spec)))
         .collect()
 }
 

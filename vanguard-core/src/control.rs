@@ -100,6 +100,6 @@ pub struct Engagement {
 pub struct EngagementReport {
     pub lines: Vec<Engagement>,
     pub neutralized: usize,
-    /// Where aborted interceptors are sent to self-destruct (drawn on the map).
-    pub safe_zone: Position,
+    /// Safe drop zones where aborted interceptors self-destruct (drawn on the map).
+    pub safe_zones: Vec<Position>,
 }

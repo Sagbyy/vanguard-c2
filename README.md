@@ -108,15 +108,25 @@ plateforme en cliquant sur la carte** (nom / portée / munitions), d'en retirer,
 **réinitialiser** (`↺ RESET`) au scénario de base. Tout passe par NATS : l'UI publie sur
 `control.map.config` / `control.platform.add` / `control.platform.remove` / `control.reset`.
 
-### Boucle d'engagement (TEWA)
+### Boucle d'engagement (TEWA) + reconnaissance par l'intercepteur
 
-`vanguard-control` fusionne les détections, ne retient que les contacts **classés réels**
-(les leurres sont ignorés → ils fuient sans dégât), puis résout l'**assignation
-arme-cible par l'algorithme hongrois** (`pathfinding::kuhn_munkres`) : il maximise la
-valeur totale d'engagement sur tout le réseau — jamais deux plateformes sur la même
-menace, jamais un bon tir gaspillé. Chaque tir consomme une munition, neutralise la
-menace, et publie le résultat sur `control.threat.destroyed` (la map retire la menace)
-et `control.engagements` (compteur **NEUTRALIZED**).
+Les **plateformes détectent** seulement (chaque contact est `Unknown` — elles ne
+distinguent pas réel/leurre). `vanguard-control` assigne les contacts détectés par
+l'**algorithme hongrois** (`pathfinding::kuhn_munkres`) — intercepteurs en vol + tubes
+libres × contacts, avec **hystérésis** pour le re-tasking dynamique (jamais deux tirs sur
+la même menace, jamais un bon tir gaspillé). Chaque tube lance un **vrai intercepteur**
+qui vole vers un **point d'interception prédit (PIP)** (`vanguard_core::predicted_intercept`,
+résolution quadratique sur la vitesse estimée).
+
+C'est l'**autodirecteur de l'intercepteur qui reconnaît** réel vs leurre, en **phase
+terminale** une fois à `RECOGNITION_RANGE` de la cible (défaut 4 km, env `RECOGNITION_RANGE_M`) :
+menace réelle → impact (kill) ; **leurre → abort** (l'intercepteur vire vers la zone sûre et
+le leurre est exclu des engagements suivants pour ne plus gaspiller de munition). La
+reconnaissance est estampillée sur les rapports → le dashboard colore la piste
+(ambre `UNKNOWN` → rouge `REAL` / gris `DECOY`) au moment où un intercepteur l'identifie.
+
+Re-tasking **manuel** : cliquer un intercepteur puis une menace le redirige ; le bouton
+**ABORT** l'envoie se crasher dans la **zone sûre** (`SAFE DROP ZONE`).
 
 Chaque tir lance un **vrai intercepteur** qui vole vers un **point d'interception prédit
 (PIP)** : `vanguard_core::predicted_intercept` résout l'équation d'interception

@@ -31,8 +31,8 @@ interface TacticalMapProps {
   bursts: { key: number; position: Position; kind: 'kill' | 'impact' }[]
   /** Defended-zone radius in metres (follows the config slider). */
   zoneRadius: number
-  /** Safe drop zone where aborted interceptors self-destruct. */
-  safeZone: Position
+  /** Safe drop zones where aborted interceptors self-destruct. */
+  safeZones: Position[]
   /** Currently selected interceptor id (for re-task / abort), or null. */
   selectedInterceptor: string | null
   onSelectInterceptor: (id: string | null) => void
@@ -92,7 +92,7 @@ export function TacticalMap({
   interceptors,
   bursts,
   zoneRadius,
-  safeZone,
+  safeZones,
   selectedInterceptor,
   onSelectInterceptor,
   onRetarget,
@@ -123,7 +123,7 @@ export function TacticalMap({
     interceptors: { id: string; position: Position; diverting: boolean }[]
   }>({ threats: [], platforms: [], engagements: [], interceptors: [] })
   const intTrailsRef = useRef(new Map<string, [number, number][]>())
-  const safeMarkerRef = useRef<maplibregl.Marker | null>(null)
+  const safeMarkersRef = useRef(new Map<number, maplibregl.Marker>())
   // Active impact bursts: key → {position, kind, start ms}.
   const burstsRef = useRef(new Map<number, { position: Position; kind: string; start: number }>())
   // Highest burst key already played — bursts are monotonic, so each plays once.
@@ -145,6 +145,7 @@ export function TacticalMap({
     map.addControl(new maplibregl.ScaleControl({ unit: 'metric' }), 'bottom-left')
 
     map.on('click', (e) => {
+      if (!e?.lngLat) return
       if (placingRef.current) {
         onMapClickRef.current(fromLngLat(e.lngLat.lng, e.lngLat.lat))
       } else if (selectedRef.current) {
@@ -153,11 +154,6 @@ export function TacticalMap({
     })
 
     map.on('load', () => {
-      // Safe drop zone marker (aborted interceptors self-destruct here).
-      const safe = document.createElement('div')
-      safe.className = 'safe-marker'
-      safe.innerHTML = '<div class="safe-core"></div><span class="safe-label">SAFE DROP ZONE</span>'
-      safeMarkerRef.current = new maplibregl.Marker({ element: safe }).setLngLat(toLngLat(safeZone)).addTo(map)
 
       // Defended zone — where threats aim. Radius set by an effect (config slider).
       map.addSource('zone', { type: 'geojson', data: empty() })
@@ -292,10 +288,30 @@ export function TacticalMap({
     map.setLayoutProperty('sat-dim', 'visibility', sat ? 'visible' : 'none')
   }, [basemap, ready])
 
-  // Keep the safe-zone marker positioned.
+  // Safe drop-zone markers (one per zone; aborted interceptors crash here).
   useEffect(() => {
-    if (ready) safeMarkerRef.current?.setLngLat(toLngLat(safeZone))
-  }, [safeZone, ready])
+    const map = mapRef.current
+    if (!map || !ready) return
+    const markers = safeMarkersRef.current
+    safeZones.forEach((zone, i) => {
+      let marker = markers.get(i)
+      if (!marker) {
+        const el = document.createElement('div')
+        el.className = 'safe-marker'
+        el.innerHTML = '<div class="safe-core"></div><span class="safe-label">SAFE DROP ZONE</span>'
+        // Position MUST be set before addTo, or MapLibre reads an undefined lngLat.
+        marker = new maplibregl.Marker({ element: el }).setLngLat(toLngLat(zone)).addTo(map)
+        markers.set(i, marker)
+      }
+      marker.setLngLat(toLngLat(zone))
+    })
+    for (const [i, marker] of markers) {
+      if (i >= safeZones.length) {
+        marker.remove()
+        markers.delete(i)
+      }
+    }
+  }, [safeZones, ready])
 
   // Defended-zone circle follows the config slider.
   useEffect(() => {

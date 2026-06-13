@@ -39,7 +39,7 @@ export function useNats(url: string = NATS_WS_URL) {
   const [threats, setThreats] = useState<Threat[]>([])
   const [platforms, setPlatforms] = useState<Map<string, PlatformView>>(new Map())
   const [classifications, setClassifications] = useState<Map<string, ThreatClassification>>(new Map())
-  const [engagements, setEngagements] = useState<EngagementReport>({ lines: [], neutralized: 0, safe_zone: { x: 40000, y: 40000 } })
+  const [engagements, setEngagements] = useState<EngagementReport>({ lines: [], neutralized: 0, safe_zones: [] })
   const [interceptors, setInterceptors] = useState<FlyingInterceptor[]>([])
   const [feed, setFeed] = useState<FeedEvent[]>([])
   const [bursts, setBursts] = useState<Burst[]>([])
@@ -53,7 +53,7 @@ export function useNats(url: string = NATS_WS_URL) {
   const threatsRef = useRef<Threat[]>([])
   const platformsRef = useRef<Map<string, PlatformView>>(new Map())
   const classRef = useRef<Map<string, ThreatClassification>>(new Map())
-  const engagementsRef = useRef<EngagementReport>({ lines: [], neutralized: 0, safe_zone: { x: 40000, y: 40000 } })
+  const engagementsRef = useRef<EngagementReport>({ lines: [], neutralized: 0, safe_zones: [] })
   const interceptorsRef = useRef<FlyingInterceptor[]>([])
   const dirty = useRef(false)
 
@@ -208,12 +208,12 @@ export function useNats(url: string = NATS_WS_URL) {
     threatsRef.current = []
     platformsRef.current = new Map()
     classRef.current = new Map()
-    engagementsRef.current = { lines: [], neutralized: 0, safe_zone: { x: 40000, y: 40000 } }
+    engagementsRef.current = { lines: [], neutralized: 0, safe_zones: [] }
     interceptorsRef.current = []
     setThreats([])
     setPlatforms(new Map())
     setClassifications(new Map())
-    setEngagements({ lines: [], neutralized: 0, safe_zone: { x: 40000, y: 40000 } })
+    setEngagements({ lines: [], neutralized: 0, safe_zones: [] })
     setInterceptors([])
     setFeed([])
     setBursts([])

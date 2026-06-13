@@ -200,7 +200,7 @@ export default function App() {
             interceptors={interceptors}
             bursts={bursts}
             zoneRadius={zoneRadius}
-            safeZone={engagements.safe_zone}
+            safeZones={engagements.safe_zones}
             selectedInterceptor={selectedInterceptor}
             onSelectInterceptor={setSelectedInterceptor}
             onRetarget={retargetInterceptor}

@@ -155,7 +155,7 @@ export interface Engagement {
 export interface EngagementReport {
   lines: Engagement[]
   neutralized: number
-  safe_zone: Position
+  safe_zones: Position[]
 }
 
 export const STALE_AFTER_MS = 5_000
