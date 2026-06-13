@@ -99,7 +99,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     short(&threat.id),
                     threat.position.x,
                     threat.position.y,
-                    reach,
+                    range,
                 );
             }
 
@@ -142,7 +142,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             platform_id: platform.id,
             name: platform.name.clone(),
             position: platform.position.clone(),
-            range: platform.reach,
+            reach: platform.reach,
             threats: contacts,
             interceptors_remaining: platform
                 .interceptors
