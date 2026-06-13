@@ -9,7 +9,7 @@ use crate::{
 };
 
 use vanguard_core::{
-    Assignment, DetectedThreat, Message, NeighborPlatform, interceptor::TrackStatus, subjects::*,
+    Assignment, Message, NeighborPlatform, interceptor::TrackStatus, subjects::*,
 };
 
 pub struct Orchestrator {
@@ -121,7 +121,7 @@ impl Orchestrator {
         let Message::NeighborUpdate {
             platform_id,
             position,
-            reach,
+            reach: _,
             interceptors_remaining,
         } = serde_json::from_slice(payload)?
         else {

@@ -1,4 +1,4 @@
-use std::{collections::HashMap, time::Duration};
+use std::time::Duration;
 
 use anyhow::Result;
 use async_nats::Client;
@@ -7,7 +7,7 @@ use uuid::Uuid;
 
 use crate::state::InterceptorRuntimeState;
 
-use vanguard_core::{InterceptorState, Message, ThreatTrack, subjects::*};
+use vanguard_core::{InterceptorState, Message, subjects::*};
 
 const SPEED: f64 = 100.0;
 const INTERCEPT_DISTANCE: f64 = 25.0;

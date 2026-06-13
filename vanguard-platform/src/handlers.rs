@@ -284,7 +284,7 @@ impl Platform {
         match message {
             Message::ThreatDetected {
                 threat,
-                source_platform,
+                source_platform: _,
             } => {
                 self.handle_threat_detected(threat);
             }
@@ -299,7 +299,7 @@ impl Platform {
 
             Message::ThreatEngaged {
                 threat_id,
-                platform_id,
+                platform_id: _,
                 interceptor_id,
             } => {
                 self.handle_threat_engaged(threat_id, interceptor_id);
@@ -319,12 +319,12 @@ impl Platform {
                 self.handle_track_updated(track);
             }
             Message::NewPlatform {
-                platform_id,
-                position,
-                reach,
+                platform_id: _,
+                position: _,
+                reach: _,
             } => {}
             Message::InterceptorUpdate {
-                platform_id,
+                platform_id: _,
                 interceptor,
             } => self.handle_interceptor_update(interceptor),
             _ => {}
