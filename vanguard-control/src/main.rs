@@ -2,6 +2,7 @@
 //! ground-truth threat feed, and lets the UI add/remove platforms live.
 
 mod engagement;
+mod fusion;
 
 use std::collections::{HashMap, HashSet};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -16,6 +17,7 @@ use vanguard_core::{
 };
 
 use crate::engagement::Engagements;
+use crate::fusion::TrackFuser;
 
 const DEFAULT_NATS_URL: &str = "nats://127.0.0.1:4222";
 /// Distance at which an interceptor's seeker recognises real-vs-decoy (terminal).
@@ -40,6 +42,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut radars = preset_radars();
     let mut engagements = Engagements::default();
+    let mut fuser = TrackFuser::default();
     let mut last_ms = 0u64;
     let mut time_scale = 1.0_f64;
 
@@ -68,6 +71,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 // engageable set = every detected contact except confirmed decoys.
                 let recognized = engagements.recognized().clone();
                 let mut engageable: HashSet<Uuid> = HashSet::new();
+                let mut reports = Vec::new();
                 for (id, radar) in radars.iter_mut() {
                     let mut report = radar.observe(&threats, now_ms);
                     report.interceptors_remaining = engagements.ammo(id);
@@ -80,14 +84,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             engageable.insert(contact.id);
                         }
                     }
-                    if let Ok(payload) = serde_json::to_vec(&report) {
-                        let _ = client.publish(report_subject(id), payload.into()).await;
+                    reports.push(report);
+                }
+                for report in &reports {
+                    if let Ok(payload) = serde_json::to_vec(report) {
+                        let _ = client.publish(report_subject(&report.platform_id), payload.into()).await;
                     }
                 }
 
+                // Fuse the noisy multi-platform reports into Kalman tracks; the
+                // engagement reasons about the denoised picture, not raw truth.
+                let fused = fuser.fuse(&threats, &reports, dt * time_scale.max(0.0));
+
                 // Fly interceptors, recognise, resolve impacts, assign new shots.
-                let by_id: HashMap<Uuid, &Threat> = threats.iter().map(|t| (t.id, t)).collect();
-                for tid in engagements.step(&radars, &threats, &engageable, dt, time_scale, recognition_range) {
+                let by_id: HashMap<Uuid, &Threat> = fused.iter().map(|t| (t.id, t)).collect();
+                for tid in engagements.step(&radars, &fused, &engageable, dt, time_scale, recognition_range) {
                     println!("NEUTRALIZED {} (total {})", &tid.to_string()[..8], engagements.neutralized);
                     let position = by_id.get(&tid).map(|t| t.position.clone()).unwrap_or(Position { x: 0.0, y: 0.0 });
                     let event = ThreatDestroyed { id: tid, position };
@@ -96,13 +107,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
                 }
 
-                // Publish the firing picture + in-flight interceptors.
-                // Diverting interceptors return to base (within their platform's
-                // range), so the safe areas are the platform positions themselves.
+                // Publish the firing picture + in-flight interceptors. Each safe
+                // area is a drop zone offset from its platform (not the center).
                 let report = EngagementReport {
                     lines: engagements.lines(),
                     neutralized: engagements.neutralized,
-                    safe_zones: radars.values().map(|r| r.spec().position.clone()).collect(),
+                    safe_zones: radars.values().map(|r| engagement::safe_point(r.spec())).collect(),
                 };
                 if let Ok(payload) = serde_json::to_vec(&report) {
                     let _ = client.publish(ENGAGEMENTS, payload.into()).await;
@@ -152,6 +162,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 println!("reset — restoring Kyiv preset");
                 radars = preset_radars();
                 engagements.reset();
+                fuser.reset();
                 time_scale = 1.0;
             }
         }

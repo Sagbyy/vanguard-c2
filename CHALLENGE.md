@@ -1,33 +1,46 @@
-# Coordination multi-intercepteurs et assignation des menaces en temps réel
+# Real-Time Multi-Interceptor Coordination and Threat Assignment
 
 **Alta Ares**
 
-## Énoncé du problème
+## Problem statement
 
-Les menaces modernes arrivent de toutes les directions ; les attaques simultanées dépassent la capacité d'un intercepteur seul. Construire des systèmes qui coordonnent plusieurs intercepteurs, fusionnent leurs capteurs distribués et assignent les menaces entrantes en temps réel avec un ciblage optimal, afin de neutraliser les attaques coordonnées et par saturation avant qu'elles n'atteignent les actifs défendus.
+Modern threats arrive from every direction; simultaneous attacks overwhelm a single
+interceptor. Build systems that coordinate multiple interceptors, fuse their distributed
+sensors and assign incoming threats in real time with optimal targeting, in order to
+neutralize coordinated and saturation attacks before they reach the defended assets.
 
-## Contexte
+## Context
 
-La défense aérienne exige une réponse rapide à de multiples menaces simultanées. Les systèmes actuels traitent les menaces séquentiellement ou avec une coordination manuelle, créant des failles dangereuses. Une défense en réseau nécessite :
+Air defense demands a fast response to multiple simultaneous threats. Current systems handle
+threats sequentially or with manual coordination, creating dangerous gaps. A networked
+defense requires:
 
-- **Fusion de capteurs distribuée** : combiner les données radar, optiques et RF de plusieurs plateformes d'interception
-- **Assignation des menaces en temps réel** : optimiser l'allocation d'intercepteurs limités pour maximiser le nombre de menaces neutralisées
-- **Algorithmes de coordination** : partager les données de ciblage à travers le réseau d'intercepteurs avec une latence minimale
-- **Re-tasking dynamique** : réassigner les intercepteurs en cours d'engagement si les priorités des menaces changent
+- **Distributed sensor fusion**: combine radar, optical and RF data from several interception platforms
+- **Real-time threat assignment**: optimize the allocation of limited interceptors to maximize the number of neutralized threats
+- **Coordination algorithms**: share targeting data across the interceptor network with minimal latency
+- **Dynamic re-tasking**: reassign interceptors mid-engagement if threat priorities change
 
-**Méthodes** : optimisation par graphes (algorithme hongrois, max-flow), protocoles réseau (publish-subscribe, edge computing), filtrage de Kalman pour la fusion de pistes, théorie des jeux pour l'assignation compétitive des menaces, algorithmes de consensus pour la décision distribuée, OR-Tools (Google).
+**Methods**: graph optimization (Hungarian algorithm, max-flow), network protocols
+(publish-subscribe, edge computing), Kalman filtering for track fusion, game theory for
+competitive threat assignment, consensus algorithms for distributed decision-making,
+OR-Tools (Google).
 
-## Scénario opérationnel
+## Operational scenario
 
-Un site de défense avancé fait face à une attaque coordonnée : 4 menaces drones simultanées approchant par des vecteurs différents, combinées à des essaims de leurres. Le site dispose de 3 systèmes d'interception (chacun avec des munitions et une portée d'engagement limitées). La coordination manuelle actuelle prend 15 à 20 secondes par décision d'engagement — trop lent face à une attaque par saturation.
+A forward defense site faces a coordinated attack: 4 simultaneous drone threats approaching
+on different vectors, combined with swarms of decoys. The site has 3 interception systems
+(each with limited ammunition and engagement range). Current manual coordination takes
+15–20 seconds per engagement decision — too slow against a saturation attack.
 
-Construire un système temps réel qui :
+Build a real-time system that:
 
-- Fusionne les capteurs radar et optiques des 3 plateformes d'interception en une image de pistes unifiée
-- Priorise automatiquement les menaces (vitesse, proximité, évaluation du danger)
-- Assigne à chaque intercepteur des cibles optimales selon la portée, le temps de rechargement et la probabilité d'engagement
-- Suit la disponibilité des munitions et l'état des intercepteurs à travers le réseau
-- Recalcule les assignations toutes les 1 à 2 secondes à mesure que les menaces se déplacent
-- Produit des recommandations de tir avec un score de confiance pour chaque intercepteur
+- Fuses the radar and optical sensors of the 3 interception platforms into a unified track picture
+- Automatically prioritizes threats (speed, proximity, danger assessment)
+- Assigns each interceptor optimal targets based on range, reload time and engagement probability
+- Tracks ammunition availability and interceptor status across the network
+- Recomputes assignments every 1–2 seconds as threats move
+- Produces firing recommendations with a confidence score per interceptor
 
-À mesure que les menaces se rapprochent, les commandants voient quel intercepteur doit engager quelle cible — et pourquoi. Plusieurs menaces peuvent être engagées simultanément par des tirs coordonnés, mettant en échec les attaques par saturation qui submergeraient une défense à intercepteur unique.
+As threats close in, commanders see which interceptor should engage which target — and why.
+Multiple threats can be engaged simultaneously through coordinated firing, defeating the
+saturation attacks that would overwhelm a single-interceptor defense.

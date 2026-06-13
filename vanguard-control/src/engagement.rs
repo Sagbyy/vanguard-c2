@@ -13,9 +13,21 @@ use pathfinding::kuhn_munkres::kuhn_munkres;
 use pathfinding::matrix::Matrix;
 use uuid::Uuid;
 use vanguard_core::{
-    Engagement, FlyingInterceptor, Position, Radar, Speed, Threat, ThreatClassification,
-    predicted_intercept,
+    Engagement, FlyingInterceptor, PlatformSpec, Position, Radar, Speed, Threat,
+    ThreatClassification, predicted_intercept,
 };
+
+/// A platform's safe drop zone: a fixed, deterministic point offset from the
+/// platform (random bearing from its id, at 40 % of its range — reachable, but
+/// not on top of the base). Diverting/aborted interceptors self-destruct here.
+pub fn safe_point(spec: &PlatformSpec) -> Position {
+    let bearing = (spec.id.as_u128() as u64 as f64 / u64::MAX as f64) * std::f64::consts::TAU;
+    let dist = spec.reach * 0.4;
+    Position {
+        x: spec.position.x + dist * bearing.cos(),
+        y: spec.position.y + dist * bearing.sin(),
+    }
+}
 
 const INTERCEPTOR_SPEED: f64 = 800.0;
 const HIT_RADIUS: f64 = 400.0;
@@ -340,7 +352,7 @@ impl Engagements {
                     eng.shots.push(Shot {
                         id: Uuid::new_v4(),
                         position: radar.spec().position.clone(),
-                        home: radar.spec().position.clone(),
+                        home: safe_point(radar.spec()),
                         assignment: Assignment::Target { id: t.id, locked: false },
                     });
                     eng.ammo -= 1;

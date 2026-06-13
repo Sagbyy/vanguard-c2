@@ -1,51 +1,66 @@
-# AGENTS.md — Instructions pour les agents IA
+# AGENTS.md — Instructions for AI agents
 
-## Projet
+## Project
 
-Système de défense aérienne temps réel (hackathon EDTH) : N intercepteurs publient leurs détections sur un broker **NATS**, un **orchestrateur** central fusionne les pistes, priorise les menaces et assigne les cibles. Voir `README.md` pour le contexte complet.
+Real-time air-defense system (EDTH hackathon): N interceptors publish their detections on a
+**NATS** broker, and a central **decision engine** fuses tracks, prioritizes threats and
+assigns targets. See `README.md` for the full context and the whole-backend map.
 
-## Architecture — règle d'or
+## Architecture — golden rule
 
-**Intercepteur → NATS → Orchestrateur → NATS → Intercepteur.** Les intercepteurs ne se parlent jamais directement et ne décident pas de leurs cibles : toute la logique d'assignation vit dans l'orchestrateur (`src/orchestrator.rs`). Ne pas introduire de logique de décision côté intercepteur.
+**Platform → NATS → decision engine → NATS → Platform.** Interceptors never talk to each
+other directly and do not decide their own targets: all assignment logic lives in the
+central decider. In the live demo that decider is `vanguard-control`
+(`vanguard-control/src/engagement.rs`); in the modular event-bus design it is
+`vanguard-orchestrator` (`vanguard-orchestrator/src/orchestrator.rs`). Do not push targeting
+decisions down to the platform/interceptor side.
 
-## Structure du workspace
+## Workspace structure
 
-| Crate | Rôle |
+See the table and diagram in `README.md` for the authoritative layout. In short:
+
+| Crate | Role |
 |---|---|
-| `edth_2026` (racine, `src/`) | Binaire orchestrateur : état global, fusion, assignation |
-| `interceptor/` | Binaire plateforme d'interception : capteurs simulés, exécution des ordres |
-| `common/` | Types partagés sérialisables (serde) échangés sur NATS |
+| `vanguard-core` | Shared serde types and NATS subjects exchanged on the bus |
+| `vanguard-map` | Ground-truth simulation (demo) |
+| `vanguard-control` | Platform host + engagement engine — the central decider (demo) |
+| `vanguard-orchestrator` / `vanguard-platform` / `vanguard-interceptor` | Modular event-bus runtime |
 
-- Les types qui transitent sur NATS (`InterceptorReport`, `InterceptorOrder`, `DetectedThreat`, `Position`) doivent vivre dans `common` avec `#[derive(Serialize, Deserialize)]`, pas être dupliqués dans chaque binaire.
-- ⚠️ État actuel : `common` n'a pas encore de `src/lib.rs` — les modèles sont encore dans `src/models.rs` à la racine. La migration vers `common` est un TODO connu.
+- Types that travel over NATS (`InterceptorReport`, `InterceptorOrder`, `DetectedThreat`, `Position`) must live in `vanguard-core` with `#[derive(Serialize, Deserialize)]`, not be duplicated in each binary.
+- ⚠️ Known TODO: an empty `common/` crate still exists from an earlier migration plan; the shared types currently live in `vanguard-core`.
 
-## Conventions de code
+## Code conventions
 
-- **Minimalisme avant tout** : toujours la solution la plus simple avec le moins de lignes de code possible. Pas d'abstraction spéculative (trait, generic, module) tant qu'il n'y a pas au moins deux usages concrets ; pas de gestion de cas qui n'arrivent pas encore ; pas de dépendance en plus si la lib standard suffit. Contexte hackathon : un code court qui marche bat un code extensible.
-- Rust édition 2024, async avec **tokio** (`#[tokio::main]`, `rt-multi-thread`).
-- Messagerie via **async-nats** + **serde_json**. Sujets NATS à nommer en hiérarchie : `interceptor.<id>.report`, `orchestrator.orders.<id>` (ou équivalent cohérent — vérifier l'existant avant d'en créer).
-- L'orchestrateur fonctionne en **tick** (cible : recalcul toutes les 1–2 s) : `OrchestratorState::tick(reports) -> Vec<(id, InterceptorOrder)>`. Conserver cette séparation pure (état + calcul) / IO (NATS) : la logique d'assignation doit rester testable sans broker.
-- N'émettre un ordre que s'il **change** (déjà le cas dans `assign()`) — ne pas spammer le bus.
-- Pas de `unwrap()` sur les chemins IO/réseau ; réserver `unwrap`/`expect` aux invariants internes.
+- **Minimalism first**: always the simplest solution with the fewest lines of code. No speculative abstraction (trait, generic, module) until there are at least two concrete uses; no handling of cases that do not happen yet; no extra dependency if the standard library suffices. Hackathon context: short code that works beats extensible code.
+- Rust edition 2024, async with **tokio** (`#[tokio::main]`, `rt-multi-thread`).
+- Messaging via **async-nats** + **serde_json**. Name NATS subjects hierarchically: `platform.<id>.report`, `control.*` (or a consistent equivalent — check what exists before creating a new one).
+- The decision engine runs on a **tick** (target: recompute every 1–2 s): keep the pure separation (state + computation) from IO (NATS) — the assignment logic must stay testable without a broker.
+- Only emit an order when it **changes** — do not spam the bus.
+- No `unwrap()` on IO/network paths; reserve `unwrap`/`expect` for internal invariants.
 
-## Commandes
+## Commands
 
 ```bash
-cargo build                 # builder tout le workspace
-cargo run                   # orchestrateur
-cargo run -p interceptor    # un intercepteur
+cargo build                 # build the whole workspace
+cargo run -p vanguard-map   # ground-truth map
+cargo run -p vanguard-control  # platform host + engagement engine
 cargo test                  # tests
-cargo clippy --workspace    # lint — corriger les warnings introduits
-cargo fmt                   # formatage avant commit
+cargo clippy --workspace    # lint — fix any warnings you introduce
+cargo fmt                   # format before committing
 ```
 
-NATS local : `docker run -p 4222:4222 nats:latest` (port par défaut 4222).
+Local NATS: `docker run -p 4222:4222 nats:latest` (default port 4222).
 
-## Pistes algorithmiques prévues
+## Planned algorithmic directions
 
-Si on te demande d'améliorer l'assignation, les méthodes visées par le sujet sont : algorithme hongrois / max-flow (éventuellement via OR-Tools), filtrage de Kalman pour la fusion de pistes, et prise en compte des contraintes réelles (portée `sight_reach`, munitions `ammo_remaining`, temps de rechargement, probabilité d'engagement). L'heuristique actuelle (tous sur la menace de plus haut niveau) est un placeholder assumé.
+If asked to improve the assignment, the methods targeted by the challenge are: Hungarian
+algorithm / max-flow (optionally via OR-Tools), Kalman filtering for track fusion, and
+accounting for real constraints (range `reach`, ammunition `ammo`, reload time, engagement
+probability). The Hungarian assignment with hysteresis is implemented in
+`vanguard-control`; Kalman fusion exists in `vanguard-core` but is not yet wired into the
+demo.
 
 ## Git
 
-- Messages de commit courts, à l'impératif, en anglais (cohérent avec l'historique existant).
-- Pas de ligne `Co-Authored-By` dans les commits.
+- Short, imperative, English commit messages (consistent with the existing history).
+- No `Co-Authored-By` line in commits.
