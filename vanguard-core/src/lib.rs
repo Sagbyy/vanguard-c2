@@ -11,14 +11,15 @@ pub use kalman::KalmanTrack;
 pub use subjects::*;
 
 pub use control::{
-    CONTROL_RESET, MAP_CONFIG, MapConfig, PLATFORM_ADD, PLATFORM_REMOVE, PlatformSpec,
+    CONTROL_RESET, ENGAGEMENTS, Engagement, EngagementReport, FlyingInterceptor, INTERCEPTORS,
+    MAP_CONFIG, MapConfig, PLATFORM_ADD, PLATFORM_REMOVE, PlatformSpec, THREAT_DESTROYED,
 };
 pub use events::{Assignment, Message};
 pub use interceptor::{
     DetectedThreat, Interceptor, InterceptorReport, InterceptorState, NeighborPlatform,
     PlatformInterceptor, ThreatClassification, ThreatTrack,
 };
-pub use position::{Position, Speed};
+pub use position::{Position, Speed, predicted_intercept};
 pub use radar::Radar;
 pub use threat::Threat;
 pub use uuid::Uuid;

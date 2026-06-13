@@ -92,6 +92,9 @@ cargo run -p vanguard-map
 # 6. Lancer l'hôte des plateformes (un seul process) : démarre avec le preset
 #    Kiev (6 plateformes périphérie 20 km + 3 défense de point ville 7 km).
 #    On ajoute/retire/place ensuite des plateformes depuis le dashboard.
+#    C'est aussi lui qui DÉCIDE des tirs (assignation hongroise) et les exécute.
+#    CLASSIFICATION_RANGE_M (défaut 8000) = distance à laquelle on distingue
+#    une vraie menace d'un leurre (donc à laquelle on autorise le tir).
 cargo run -p vanguard-control
 
 # 7. Le dashboard web (carte réelle centrée sur Kiev + panneau de contrôle)
@@ -99,10 +102,27 @@ cd webui && pnpm install && pnpm dev    # http://localhost:5173
 ```
 
 Le panneau **SIMULATION CONTROL** du dashboard pilote la map en direct (ratio de
-leurres, taille/cadence des vagues, rayon de zone, plafond) et permet d'**ajouter une
-plateforme en cliquant sur la carte** (nom / portée / munitions) ou d'en retirer. Tout
-passe par NATS : l'UI publie sur `control.map.config` / `control.platform.add` /
-`control.platform.remove`, la map et `vanguard-control` appliquent à chaud.
+leurres, taille/cadence des vagues, rayon de zone, plafond), permet d'**ajouter une
+plateforme en cliquant sur la carte** (nom / portée / munitions), d'en retirer, et de
+**réinitialiser** (`↺ RESET`) au scénario de base. Tout passe par NATS : l'UI publie sur
+`control.map.config` / `control.platform.add` / `control.platform.remove` / `control.reset`.
+
+### Boucle d'engagement (TEWA)
+
+`vanguard-control` fusionne les détections, ne retient que les contacts **classés réels**
+(les leurres sont ignorés → ils fuient sans dégât), puis résout l'**assignation
+arme-cible par l'algorithme hongrois** (`pathfinding::kuhn_munkres`) : il maximise la
+valeur totale d'engagement sur tout le réseau — jamais deux plateformes sur la même
+menace, jamais un bon tir gaspillé. Chaque tir consomme une munition, neutralise la
+menace, et publie le résultat sur `control.threat.destroyed` (la map retire la menace)
+et `control.engagements` (compteur **NEUTRALIZED**).
+
+Chaque tir lance un **vrai intercepteur** qui vole vers un **point d'interception prédit
+(PIP)** : `vanguard_core::predicted_intercept` résout l'équation d'interception
+(quadratique) à partir de la vitesse estimée de la menace, l'intercepteur met le cap sur
+ce point d'avance et impacte à la rencontre. Les positions des munitions en vol sont
+publiées sur `control.interceptors` ; le dashboard les anime (**darts cyan + traînée**),
+interpolées en fluide comme les menaces.
 
 > Le binaire `vanguard-system-interceptor` (plateforme unique en CLI, option `--reach`)
 > reste disponible si tu préfères lancer des plateformes en process séparés.

@@ -23,6 +23,10 @@ interface TacticalMapProps {
   onMapClick: (pos: Position) => void
   /** Live preview of the platform being placed (position + reach in metres). */
   preview: { position: Position; reach: number } | null
+  /** Active engagements (platform id → threat id) to draw firing lines. */
+  engagements: { platform_id: string; threat_id: string }[]
+  /** Interceptors currently in flight (id + position) to animate. */
+  interceptors: { id: string; position: Position }[]
 }
 
 const BASE_STYLE: StyleSpecification = {
@@ -76,6 +80,8 @@ export function TacticalMap({
   placing,
   onMapClick,
   preview,
+  engagements,
+  interceptors,
 }: TacticalMapProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<maplibregl.Map | null>(null)
@@ -93,7 +99,10 @@ export function TacticalMap({
   const loopDataRef = useRef<{
     threats: Threat[]
     platforms: PlatformView[]
-  }>({ threats: [], platforms: [] })
+    engagements: { platform_id: string; threat_id: string }[]
+    interceptors: { id: string; position: Position }[]
+  }>({ threats: [], platforms: [], engagements: [], interceptors: [] })
+  const intTrailsRef = useRef(new Map<string, [number, number][]>())
   const [ready, setReady] = useState(false)
 
   useEffect(() => {
@@ -199,6 +208,29 @@ export function TacticalMap({
         },
       })
 
+      // Firing lines: platform engaging a threat (dashed red, the assignment).
+      map.addSource('engagements', { type: 'geojson', data: empty() })
+      map.addLayer({
+        id: 'engagements',
+        type: 'line',
+        source: 'engagements',
+        paint: {
+          'line-color': '#ff3b4d',
+          'line-width': 1,
+          'line-opacity': 0.35,
+          'line-dasharray': [1, 3],
+        },
+      })
+
+      // Interceptor trails (cyan comet tail behind each munition in flight).
+      map.addSource('int-trails', { type: 'geojson', data: empty() })
+      map.addLayer({
+        id: 'int-trails',
+        type: 'line',
+        source: 'int-trails',
+        paint: { 'line-color': '#7df9ff', 'line-width': 2, 'line-opacity': 0.7 },
+      })
+
       // Defended asset: a single permanent marker.
       const asset = document.createElement('div')
       asset.className = 'asset-marker'
@@ -280,8 +312,13 @@ export function TacticalMap({
       const from = curRef.current.get(threat.id) ?? threat.position
       animRef.current.set(threat.id, { from, to: threat.position })
     }
+    // Same smooth-interpolation treatment for in-flight interceptors.
+    for (const it of interceptors) {
+      const from = curRef.current.get(it.id) ?? it.position
+      animRef.current.set(it.id, { from, to: it.position })
+    }
     segRef.current = { start: performance.now(), dur }
-    loopDataRef.current = { threats, platforms }
+    loopDataRef.current = { threats, platforms, engagements, interceptors }
 
     // --- DOM markers: platforms and threats, diffed by id.
     const markers = markersRef.current
@@ -352,18 +389,33 @@ export function TacticalMap({
         `${trackedIds.has(threat.id) ? ' — TRACKED' : ''}`
     }
 
+    // Interceptor markers (cyan darts in flight).
+    for (const it of interceptors) {
+      const key = `i:${it.id}`
+      liveIds.add(key)
+      if (!markers.has(key)) {
+        const el = document.createElement('div')
+        el.className = 'interceptor-marker'
+        markers.set(
+          key,
+          new maplibregl.Marker({ element: el }).setLngLat(toLngLat(it.position)).addTo(map),
+        )
+      }
+    }
+
     for (const [key, marker] of markers) {
       if (!liveIds.has(key)) {
         marker.remove()
         markers.delete(key)
-        if (key.startsWith('t:')) {
+        if (key.startsWith('t:') || key.startsWith('i:')) {
           const id = key.slice(2)
           animRef.current.delete(id)
           curRef.current.delete(id)
+          intTrailsRef.current.delete(id)
         }
       }
     }
-  }, [threats, platforms, ready, classifications])
+  }, [threats, platforms, ready, classifications, engagements, interceptors])
 
   // Animation loop: tween threat markers + their vectors/links between samples.
   useEffect(() => {
@@ -374,7 +426,7 @@ export function TacticalMap({
     const frame = () => {
       const { start, dur } = segRef.current
       const k = dur > 0 ? Math.min(1, (performance.now() - start) / dur) : 1
-      const { threats, platforms } = loopDataRef.current
+      const { threats, platforms, engagements, interceptors } = loopDataRef.current
       const markers = markersRef.current
       const now = Date.now()
 
@@ -388,6 +440,35 @@ export function TacticalMap({
         curRef.current.set(threat.id, cur)
         markers.get(`t:${threat.id}`)?.setLngLat(toLngLat(cur))
       }
+
+      // Interceptors: interpolate position, move marker, grow comet trail.
+      const trailFeatures = []
+      for (const it of interceptors) {
+        const seg = animRef.current.get(it.id)
+        if (!seg) continue
+        const cur: Position = {
+          x: seg.from.x + (seg.to.x - seg.from.x) * k,
+          y: seg.from.y + (seg.to.y - seg.from.y) * k,
+        }
+        curRef.current.set(it.id, cur)
+        markers.get(`i:${it.id}`)?.setLngLat(toLngLat(cur))
+
+        const trail = intTrailsRef.current.get(it.id) ?? []
+        trail.push(toLngLat(cur))
+        if (trail.length > 40) trail.shift()
+        intTrailsRef.current.set(it.id, trail)
+        if (trail.length > 1) {
+          trailFeatures.push({
+            type: 'Feature' as const,
+            geometry: { type: 'LineString' as const, coordinates: trail },
+            properties: {},
+          })
+        }
+      }
+      ;(map.getSource('int-trails') as GeoJSONSource | undefined)?.setData({
+        type: 'FeatureCollection',
+        features: trailFeatures,
+      })
 
       const links = platforms.flatMap(({ report, lastSeen }) =>
         now - lastSeen > STALE_AFTER_MS
@@ -408,6 +489,26 @@ export function TacticalMap({
       ;(map.getSource('links') as GeoJSONSource | undefined)?.setData({
         type: 'FeatureCollection',
         features: links,
+      })
+
+      // Firing lines: platform → engaged threat (interpolated positions).
+      const platformPos = new Map(platforms.map((p) => [p.report.platform_id, p.report.position]))
+      const engLines = engagements.flatMap((e) => {
+        const from = platformPos.get(e.platform_id)
+        const to = curRef.current.get(e.threat_id)
+        return from && to
+          ? [
+              {
+                type: 'Feature' as const,
+                geometry: { type: 'LineString' as const, coordinates: [toLngLat(from), toLngLat(to)] },
+                properties: {},
+              },
+            ]
+          : []
+      })
+      ;(map.getSource('engagements') as GeoJSONSource | undefined)?.setData({
+        type: 'FeatureCollection',
+        features: engLines,
       })
 
       raf = requestAnimationFrame(frame)

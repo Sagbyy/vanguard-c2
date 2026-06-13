@@ -90,7 +90,17 @@ function ThreatRow({ threat, category }: { threat: Threat; category: TrackCatego
 }
 
 export default function App() {
-  const { status, threats, platforms, classifications, publish, removePlatform, reset } = useNats()
+  const {
+    status,
+    threats,
+    platforms,
+    classifications,
+    engagements,
+    interceptors,
+    publish,
+    removePlatform,
+    reset,
+  } = useNats()
   const [now, setNow] = useState(() => Date.now())
   const [basemap, setBasemap] = useState<Basemap>('dark')
   const [placing, setPlacing] = useState(false)
@@ -150,6 +160,9 @@ export default function App() {
             ??? <span className="font-bold text-amber-300">{counts.unknown}</span>
           </span>
           <span>
+            NEUTRALIZED <span className="font-bold text-cyan-300">{engagements.neutralized}</span>
+          </span>
+          <span>
             PLATFORMS <span className="font-bold text-emerald-400">{platformList.length}</span>
           </span>
           <button
@@ -173,6 +186,8 @@ export default function App() {
             placing={placing}
             onMapClick={(pos) => setPending(pos)}
             preview={pending ? { position: pending, reach: previewReach } : null}
+            engagements={engagements.lines}
+            interceptors={interceptors}
           />
         </main>
 

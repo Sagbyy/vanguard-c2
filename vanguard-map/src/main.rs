@@ -4,7 +4,9 @@ use futures::StreamExt;
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 use uuid::Uuid;
-use vanguard_core::{CONTROL_RESET, MAP_CONFIG, MapConfig, Position, THREATS_SUBJECT, Threat};
+use vanguard_core::{
+    CONTROL_RESET, MAP_CONFIG, MapConfig, Position, THREAT_DESTROYED, THREATS_SUBJECT, Threat,
+};
 
 const WORLD_RADIUS: f64 = 50_000.0; // ingress ring, well outside every radar bubble
 const TICK: std::time::Duration = std::time::Duration::from_millis(500);
@@ -32,6 +34,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut config_sub = client.subscribe(MAP_CONFIG).await?;
     let mut reset_sub = client.subscribe(CONTROL_RESET).await?;
+    let mut destroyed_sub = client.subscribe(THREAT_DESTROYED).await?;
 
     let mut rng = StdRng::seed_from_u64(SEED);
     let mut actives: Vec<Active> = Vec::new();
@@ -62,6 +65,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 actives.clear();
                 config = MapConfig::default();
                 last_swarm_t = f64::NEG_INFINITY;
+                continue;
+            }
+            Some(msg) = destroyed_sub.next() => {
+                if let Ok(id) = std::str::from_utf8(&msg.payload).unwrap_or("").parse::<Uuid>() {
+                    actives.retain(|a| a.threat.id != id);
+                }
                 continue;
             }
         }

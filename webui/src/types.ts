@@ -105,6 +105,27 @@ export const MAP_CONFIG_SUBJECT = 'control.map.config'
 export const PLATFORM_ADD_SUBJECT = 'control.platform.add'
 export const PLATFORM_REMOVE_SUBJECT = 'control.platform.remove'
 export const CONTROL_RESET_SUBJECT = 'control.reset'
+export const ENGAGEMENTS_SUBJECT = 'control.engagements'
+export const INTERCEPTORS_SUBJECT = 'control.interceptors'
+
+/** Mirror of vanguard_core::FlyingInterceptor. */
+export interface FlyingInterceptor {
+  id: string
+  position: Position
+  target_id: string
+}
+
+/** Mirror of vanguard_core::Engagement. */
+export interface Engagement {
+  platform_id: string
+  threat_id: string
+}
+
+/** Mirror of vanguard_core::EngagementReport. */
+export interface EngagementReport {
+  lines: Engagement[]
+  neutralized: number
+}
 
 export const STALE_AFTER_MS = 5_000
 /** A platform silent for this long is removed from the picture entirely. */

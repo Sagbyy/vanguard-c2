@@ -2,7 +2,11 @@ import { connect, type NatsConnection } from 'nats.ws'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   CONTROL_RESET_SUBJECT,
+  ENGAGEMENTS_SUBJECT,
+  INTERCEPTORS_SUBJECT,
   PLATFORM_REMOVE_SUBJECT,
+  type EngagementReport,
+  type FlyingInterceptor,
   type InterceptorReport,
   type PlatformView,
   type Threat,
@@ -30,6 +34,8 @@ export function useNats(url: string = NATS_WS_URL) {
   const [classifications, setClassifications] = useState<Map<string, ThreatClassification>>(
     new Map(),
   )
+  const [engagements, setEngagements] = useState<EngagementReport>({ lines: [], neutralized: 0 })
+  const [interceptors, setInterceptors] = useState<FlyingInterceptor[]>([])
   const connectionRef = useRef<NatsConnection | undefined>(undefined)
   // Platforms just removed — ignore any in-flight report for them briefly so
   // they don't flicker back before the host stops publishing.
@@ -103,6 +109,18 @@ export function useNats(url: string = NATS_WS_URL) {
       })()
 
       void (async () => {
+        for await (const message of connection.subscribe(ENGAGEMENTS_SUBJECT)) {
+          setEngagements(JSON.parse(decoder.decode(message.data)) as EngagementReport)
+        }
+      })()
+
+      void (async () => {
+        for await (const message of connection.subscribe(INTERCEPTORS_SUBJECT)) {
+          setInterceptors(JSON.parse(decoder.decode(message.data)) as FlyingInterceptor[])
+        }
+      })()
+
+      void (async () => {
         for await (const message of connection.subscribe('platform.*.report')) {
           const report = JSON.parse(decoder.decode(message.data)) as InterceptorReport
           // Skip reports for a just-removed platform during the grace window.
@@ -144,7 +162,19 @@ export function useNats(url: string = NATS_WS_URL) {
     setThreats([])
     setPlatforms(new Map())
     setClassifications(new Map())
+    setEngagements({ lines: [], neutralized: 0 })
+    setInterceptors([])
   }, [publish])
 
-  return { status, threats, platforms, classifications, publish, removePlatform, reset }
+  return {
+    status,
+    threats,
+    platforms,
+    classifications,
+    engagements,
+    interceptors,
+    publish,
+    removePlatform,
+    reset,
+  }
 }

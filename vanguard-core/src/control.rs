@@ -46,3 +46,32 @@ pub const PLATFORM_REMOVE: &str = "control.platform.remove";
 /// UI → map + host: reset to the baseline scenario (default config, preset
 /// platforms, cleared threats). Payload is ignored.
 pub const CONTROL_RESET: &str = "control.reset";
+
+/// Host → map: a threat was neutralised (payload = threat id string).
+pub const THREAT_DESTROYED: &str = "control.threat.destroyed";
+/// Host → UI: current firing picture (who engages what + kill count).
+pub const ENGAGEMENTS: &str = "control.engagements";
+/// Host → UI: positions of interceptors currently in flight.
+pub const INTERCEPTORS: &str = "control.interceptors";
+
+/// One interceptor (munition) in flight toward its target.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct FlyingInterceptor {
+    pub id: Uuid,
+    pub position: Position,
+    pub target_id: Uuid,
+}
+
+/// One active engagement: platform `platform_id` is firing on `threat_id`.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Engagement {
+    pub platform_id: Uuid,
+    pub threat_id: Uuid,
+}
+
+/// Firing picture published each tick for the operator view.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct EngagementReport {
+    pub lines: Vec<Engagement>,
+    pub neutralized: usize,
+}
