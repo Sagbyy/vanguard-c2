@@ -11,15 +11,22 @@ const SWARM_EVERY_TICKS: u64 = 90; // one swarm wave every ~45 s
 const PUBLISH_EVERY_TICKS: u64 = 2; // ground truth published every second
 const MAX_ACTIVE_THREATS: usize = 40; // saturation cap, keeps the raid readable
 const SWARM_SIZE: std::ops::Range<usize> = 6..13; // drones per wave
-const DECOY_RATIO: f64 = 0.4; // share of the wave that are empty decoys
+const DECOY_RATIO: f64 = 0.6; // share of the wave that are empty decoys
 const SECTOR_SPREAD_DEG: f64 = 20.0; // wave fans out within ±20° of one bearing
 const REAL_SPEED: std::ops::Range<f64> = 100.0..170.0; // attack drones, m/s
 const DECOY_SPEED: std::ops::Range<f64> = 70.0..120.0; // decoys, a bit slower
 const IMPACT_RADIUS: f64 = 50.0;
+const DEFENDED_ZONE_RADIUS: f64 = 6_000.0; // threats aim at random points across the city
 const SEED: u64 = 42;
 const DEFAULT_NATS_URL: &str = "nats://127.0.0.1:4222";
 
 const CENTER: Position = Position { x: 0.0, y: 0.0 };
+
+/// A live threat with its own impact point inside the defended zone.
+struct Active {
+    threat: Threat,
+    target: Position,
+}
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -28,7 +35,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("map online — publishing threats on `{THREATS_SUBJECT}` via {nats_url}");
 
     let mut rng = StdRng::seed_from_u64(SEED);
-    let mut threats: Vec<Threat> = Vec::new();
+    let mut actives: Vec<Active> = Vec::new();
     let mut ticker = tokio::time::interval(TICK);
 
     let dt = TICK.as_secs_f64();
@@ -36,43 +43,42 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         ticker.tick().await;
         let t = tick as f64 * dt;
 
-        if tick % SWARM_EVERY_TICKS == 0 && threats.len() < MAX_ACTIVE_THREATS {
+        if tick % SWARM_EVERY_TICKS == 0 && actives.len() < MAX_ACTIVE_THREATS {
             let swarm = spawn_swarm(&mut rng);
-            let decoys = swarm.iter().filter(|t| t.is_decoy).count();
-            let bearing = swarm[0].position.y.atan2(swarm[0].position.x).to_degrees();
+            let decoys = swarm.iter().filter(|a| a.threat.is_decoy).count();
+            let bearing = swarm[0]
+                .threat
+                .position
+                .y
+                .atan2(swarm[0].threat.position.x)
+                .to_degrees();
             println!(
                 "[{t:6.1}s] SWARM inbound — {} drones ({} decoys) bearing {:.0}°",
                 swarm.len(),
                 decoys,
                 (bearing + 360.0) % 360.0,
             );
-            threats.extend(swarm);
+            actives.extend(swarm);
         }
 
-        for threat in &mut threats {
-            threat.position = threat.position.step_toward(&CENTER, threat.speed * dt);
+        for active in &mut actives {
+            active.threat.position =
+                active.threat.position.step_toward(&active.target, active.threat.speed * dt);
         }
 
-        threats.retain(|threat| {
-            let reached = threat.position.distance(&CENTER) < IMPACT_RADIUS;
+        actives.retain(|active| {
+            let reached = active.threat.position.distance(&active.target) < IMPACT_RADIUS;
             if reached {
                 println!(
-                    "[{t:6.1}s] threat {} reached defended point — LEAKER",
-                    short(&threat.id),
+                    "[{t:6.1}s] threat {} reached impact point — LEAKER",
+                    short(&active.threat.id),
                 );
             }
             !reached
         });
 
         if tick % PUBLISH_EVERY_TICKS == 0 {
-            for threat in &threats {
-                println!(
-                    "[{t:6.1}s] threat {} at ({:.0}, {:.0})",
-                    short(&threat.id),
-                    threat.position.x,
-                    threat.position.y,
-                );
-            }
+            let threats: Vec<&Threat> = actives.iter().map(|a| &a.threat).collect();
             let payload = serde_json::to_vec(&threats)?;
             client.publish(THREATS_SUBJECT, payload.into()).await?;
         }
@@ -82,8 +88,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 /// One attack wave: real loitering munitions mixed with empty decoys, all
-/// ingressing from the same bearing sector (±SECTOR_SPREAD_DEG).
-fn spawn_swarm(rng: &mut StdRng) -> Vec<Threat> {
+/// ingressing from the same bearing sector (±SECTOR_SPREAD_DEG). Each drone
+/// aims at its own random impact point inside the defended zone.
+fn spawn_swarm(rng: &mut StdRng) -> Vec<Active> {
     let center_bearing = rng.gen_range(0.0..TAU);
     let spread = SECTOR_SPREAD_DEG.to_radians();
     let size = rng.gen_range(SWARM_SIZE);
@@ -98,18 +105,31 @@ fn spawn_swarm(rng: &mut StdRng) -> Vec<Threat> {
                 (rng.gen_range(REAL_SPEED), rng.gen_range(3..6))
             };
 
-            Threat {
-                id: Uuid::new_v4(),
-                position: Position {
-                    x: WORLD_RADIUS * angle.cos(),
-                    y: WORLD_RADIUS * angle.sin(),
+            Active {
+                threat: Threat {
+                    id: Uuid::new_v4(),
+                    position: Position {
+                        x: WORLD_RADIUS * angle.cos(),
+                        y: WORLD_RADIUS * angle.sin(),
+                    },
+                    speed,
+                    threat_level,
+                    is_decoy,
                 },
-                speed,
-                threat_level,
-                is_decoy,
+                target: random_zone_point(rng),
             }
         })
         .collect()
+}
+
+/// Uniform random point within the defended zone around the city centre.
+fn random_zone_point(rng: &mut StdRng) -> Position {
+    let angle = rng.gen_range(0.0..TAU);
+    let radius = DEFENDED_ZONE_RADIUS * rng.gen_range(0.0_f64..1.0).sqrt();
+    Position {
+        x: CENTER.x + radius * angle.cos(),
+        y: CENTER.y + radius * angle.sin(),
+    }
 }
 
 fn short(id: &Uuid) -> String {

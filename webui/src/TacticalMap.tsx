@@ -61,6 +61,9 @@ const CATEGORY_COLOR = {
   decoy: '#8aa3b5', // grey
 } as const
 
+// Defended zone radius (m) — mirrors DEFENDED_ZONE_RADIUS in vanguard-map.
+const DEFENDED_ZONE_RADIUS = 6_000
+
 export function TacticalMap({ threats, platforms, basemap, classifications }: TacticalMapProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<maplibregl.Map | null>(null)
@@ -91,6 +94,41 @@ export function TacticalMap({ threats, platforms, basemap, classifications }: Ta
     map.addControl(new maplibregl.ScaleControl({ unit: 'metric' }), 'bottom-left')
 
     map.on('load', () => {
+      // Defended zone — where threats aim (random impact points across the city).
+      map.addSource('zone', {
+        type: 'geojson',
+        data: {
+          type: 'FeatureCollection',
+          features: [
+            {
+              type: 'Feature',
+              geometry: {
+                type: 'Polygon',
+                coordinates: [rangeRing({ x: 0, y: 0 }, DEFENDED_ZONE_RADIUS)],
+              },
+              properties: {},
+            },
+          ],
+        },
+      })
+      map.addLayer({
+        id: 'zone-fill',
+        type: 'fill',
+        source: 'zone',
+        paint: { 'fill-color': '#39d5ff', 'fill-opacity': 0.05 },
+      })
+      map.addLayer({
+        id: 'zone-line',
+        type: 'line',
+        source: 'zone',
+        paint: {
+          'line-color': '#39d5ff',
+          'line-width': 1,
+          'line-dasharray': [3, 3],
+          'line-opacity': 0.4,
+        },
+      })
+
       map.addSource('ranges', { type: 'geojson', data: empty() })
       map.addLayer({
         id: 'ranges-fill',

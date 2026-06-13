@@ -89,13 +89,22 @@ docker run -p 4222:4222 nats:latest
 # 5. Lancer la carte (terminal 2) : vérité terrain, publie les menaces sur NATS
 cargo run -p vanguard-map
 
-# 6. Lancer des plateformes d'interception (un terminal chacune) :
-#    chacune reste active, son radar s'abonne aux menaces et print ses détections.
-#    Positions réelles autour de Kiev (offsets en mètres depuis le centre-ville) :
-cargo run -p vanguard-system-interceptor -- --name hostomel -n 6 -x -18600 -y 14800
-cargo run -p vanguard-system-interceptor -- --name brovary  -n 6 -x 18900  -y 6800
-cargo run -p vanguard-system-interceptor -- --name vasylkiv -n 6 -x -15100 -y -30400
-cargo run -p vanguard-system-interceptor -- --name boryspil -n 6 -x 30200  -y -11700
+# 6. Lancer les plateformes d'interception (un terminal chacune).
+#    Déploiement type défense de Kiev (offsets en mètres depuis le centre) :
+#    --reach = portée radar (longue en périphérie, courte en ville).
+
+#    Anneau longue portée (périphérie, 20 km) :
+cargo run -p vanguard-system-interceptor -- --name hostomel  -n 6 -x -18600 -y 14800  --reach 20000
+cargo run -p vanguard-system-interceptor -- --name brovary   -n 6 -x 18900  -y 6800   --reach 20000
+cargo run -p vanguard-system-interceptor -- --name vasylkiv  -n 6 -x -15100 -y -30400 --reach 20000
+cargo run -p vanguard-system-interceptor -- --name boryspil  -n 6 -x 30200  -y -11700 --reach 20000
+cargo run -p vanguard-system-interceptor -- --name vyshhorod -n 6 -x 1000   -y 19000  --reach 20000
+cargo run -p vanguard-system-interceptor -- --name obukhiv   -n 6 -x 6000   -y -28000 --reach 20000
+
+#    Défense de point en ville (courte portée, 7 km) :
+cargo run -p vanguard-system-interceptor -- --name maidan       -n 4 -x 0     -y 0     --reach 7000
+cargo run -p vanguard-system-interceptor -- --name livoberezhna -n 4 -x 6000  -y -1500 --reach 7000
+cargo run -p vanguard-system-interceptor -- --name sviatoshyn   -n 4 -x -9000 -y 2000  --reach 7000
 
 # 7. Le dashboard web (carte réelle centrée sur Kiev)
 cd webui && pnpm install && pnpm dev    # http://localhost:5173
@@ -107,12 +116,14 @@ cd webui && pnpm install && pnpm dev    # http://localhost:5173
 
 ### Carte (vérité terrain)
 
-Une menace apparaît toutes les 12 s sur un anneau d'ingress à 70 km et converge vers le
-point défendu en (0, 0) — le centre de Kiev côté UI. Mix réaliste : ~70 % de munitions
-rôdeuses classe Shahed-136 (~45 m/s) et ~30 % de missiles de croisière (~240 m/s),
-plafonné à 24 menaces actives. La map **print uniquement les menaces** (spawn, position
-chaque seconde, `LEAKER` à l'impact) et publie la liste sur le subject NATS
-`map.threats` chaque seconde. Portée radar des plateformes : 20 km.
+Des **vagues d'essaims** (6-12 drones) arrivent toutes les ~45 s depuis un secteur
+d'azimut aléatoire (anneau d'ingress à 50 km), mêlant vrais drones d'attaque et **leurres**
+(~40 %). Chaque drone vise son **propre point d'impact aléatoire** dans une zone défendue
+de 6 km de rayon autour du centre de Kiev (plus de point unique). Une plateforme ne peut
+distinguer un vrai drone d'un leurre qu'une fois le contact entré dans sa **portée de
+classification** (8 km par défaut, `CLASSIFICATION_RANGE_M`). La map publie la vérité
+terrain (`Vec<Threat>`) sur `map.threats` chaque seconde ; les plateformes publient leurs
+rapports radar (avec classification) sur `platform.<id>.report`.
 
 ```bash
 cargo run -p vanguard-map

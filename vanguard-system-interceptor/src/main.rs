@@ -13,7 +13,6 @@ use vanguard_core::{
 
 use crate::cli::Args;
 
-const DETECTION_RANGE: f64 = 20_000.0; // ground radar vs low-flying targets
 // Range at which the sensor can tell a real drone from a decoy (optical/RF
 // discrimination only works up close). Override with CLASSIFICATION_RANGE_M.
 const CLASSIFICATION_RANGE: f64 = 8_000.0;
@@ -43,7 +42,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         name: args.name,
         position,
         interceptors,
-        reach: DETECTION_RANGE,
+        reach: args.reach,
         neighbor_platforms: Vec::new(),
     };
 
