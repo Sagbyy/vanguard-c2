@@ -31,29 +31,20 @@ const URGENCY_SPAN: f64 = 60_000.0;
 
 /// Designated safe drop zones (empty areas well outside the city). An aborted
 /// interceptor self-destructs at the nearest one.
-pub const SAFE_ZONES: [Position; 4] = [
-    Position { x: 40_000.0, y: 40_000.0 },
-    Position { x: -40_000.0, y: 40_000.0 },
-    Position { x: 40_000.0, y: -40_000.0 },
-    Position { x: -40_000.0, y: -40_000.0 },
-];
-
-fn nearest_safe(from: &Position) -> Position {
-    SAFE_ZONES
-        .iter()
-        .min_by(|a, b| from.distance(a).total_cmp(&from.distance(b)))
-        .cloned()
-        .unwrap_or_else(|| SAFE_ZONES[0].clone())
-}
-
 enum Assignment {
     Target { id: Uuid, locked: bool },
-    Divert { to: Position },
+    /// Returning to base to self-destruct. `manual` = operator-aborted, so it is
+    /// excluded from auto re-tasking; an idle (auto) divert can re-engage a fresh
+    /// threat that enters range.
+    Divert { to: Position, manual: bool },
 }
 
 struct Shot {
     id: Uuid,
     position: Position,
+    /// Launching platform position — the reachable safe point a divert flies to
+    /// (an interceptor cannot fly beyond its own platform's range).
+    home: Position,
     assignment: Assignment,
 }
 
@@ -102,8 +93,7 @@ impl Engagements {
 
     pub fn abort(&mut self, iid: Uuid) {
         if let Some(shot) = self.shot_mut(iid) {
-            let to = nearest_safe(&shot.position);
-            shot.assignment = Assignment::Divert { to };
+            shot.assignment = Assignment::Divert { to: shot.home.clone(), manual: true };
         }
     }
 
@@ -159,7 +149,7 @@ impl Engagements {
             for shot in &mut eng.shots {
                 if let Assignment::Target { id, .. } = shot.assignment {
                     if !alive.contains(&id) {
-                        shot.assignment = Assignment::Divert { to: nearest_safe(&shot.position) };
+                        shot.assignment = Assignment::Divert { to: shot.home.clone(), manual: false };
                     }
                 }
             }
@@ -199,7 +189,7 @@ impl Engagements {
             eng.shots.retain_mut(|shot| {
                 // Snapshot the assignment so we can then mutate shot.position.
                 let target = match &shot.assignment {
-                    Assignment::Divert { to } => Err(to.clone()),
+                    Assignment::Divert { to, .. } => Err(to.clone()),
                     Assignment::Target { id, .. } => Ok(*id),
                 };
                 match target {
@@ -240,12 +230,18 @@ impl Engagements {
             })
             .collect();
 
-        let mut movers: Vec<(Uuid, Position)> = Vec::new(); // (shot_id, position)
+        // (shot_id, position, home). An auto-diverting interceptor is re-taskable:
+        // a fresh threat entering range pulls it back. A manual abort is not.
+        let mut movers: Vec<(Uuid, Position, Position)> = Vec::new();
         let mut tubes: Vec<Uuid> = Vec::new();
         for (pid, e) in &self.engagers {
             for s in &e.shots {
-                if let Assignment::Target { locked: false, .. } = s.assignment {
-                    movers.push((s.id, s.position.clone()));
+                let retaskable = matches!(
+                    s.assignment,
+                    Assignment::Target { locked: false, .. } | Assignment::Divert { manual: false, .. }
+                );
+                if retaskable {
+                    movers.push((s.id, s.position.clone(), s.home.clone()));
                 }
             }
             let capacity = MAX_IN_FLIGHT.saturating_sub(e.shots.len()).min(e.ammo);
@@ -268,12 +264,32 @@ impl Engagements {
             .iter()
             .filter(|t| engageable.contains(&t.id) && !locked_targets.contains(&t.id))
             .collect();
+        // Fallback for an in-flight interceptor the Hungarian leaves unmatched.
+        // Priority: nearest non-decoy threat (real OR not-yet-identified, even if
+        // out of radar range) > nearest recognised decoy (last resort) > RTB.
+        let is_decoy = |t: &&Threat| matches!(self.recognized.get(&t.id), Some(ThreatClassification::Decoy));
+        let nondecoy: Vec<(Uuid, Position)> =
+            threats.iter().filter(|t| !is_decoy(t)).map(|t| (t.id, t.position.clone())).collect();
+        let decoys: Vec<(Uuid, Position)> =
+            threats.iter().filter(is_decoy).map(|t| (t.id, t.position.clone())).collect();
+        let nearest = |pool: &[(Uuid, Position)], pos: &Position| {
+            pool.iter()
+                .min_by(|a, b| pos.distance(&a.1).total_cmp(&pos.distance(&b.1)))
+                .map(|(id, _)| *id)
+        };
+        let fallback = |pos: &Position, home: &Position| {
+            nearest(&nondecoy, pos)
+                .or_else(|| nearest(&decoys, pos))
+                .map(|id| Assignment::Target { id, locked: false })
+                .unwrap_or_else(|| Assignment::Divert { to: home.clone(), manual: false })
+        };
+
         if (movers.is_empty() && tubes.is_empty()) || targets.is_empty() {
-            // No targets: any free mover with no valid target diverts to safety.
-            for (sid, pos) in &movers {
-                let to = nearest_safe(pos);
+            // No engageable target: free movers fall back (non-decoy > decoy > RTB).
+            for (sid, pos, home) in &movers {
+                let assignment = fallback(pos, home);
                 if let Some(shot) = self.shot_mut(*sid) {
-                    shot.assignment = Assignment::Divert { to };
+                    shot.assignment = assignment;
                 }
             }
             return;
@@ -286,7 +302,7 @@ impl Engagements {
                     .map(|j| {
                         let Some(threat) = targets.get(j) else { return 0 };
                         if i < movers.len() {
-                            let (sid, pos) = &movers[i];
+                            let (sid, pos, _) = &movers[i];
                             let keep = mover_target.get(sid) == Some(&threat.id);
                             engage_value(pos, threat) + if keep { HYST_BONUS } else { 0 }
                         } else if i - movers.len() < tubes.len() {
@@ -303,11 +319,11 @@ impl Engagements {
         for (i, &j) in assignment.iter().enumerate() {
             let threat = targets.get(j).copied();
             if i < movers.len() {
-                let (sid, pos) = movers[i].clone();
+                let (sid, pos, home) = movers[i].clone();
                 if let Some(shot) = self.shot_mut(sid) {
                     shot.assignment = match threat {
                         Some(t) => Assignment::Target { id: t.id, locked: false },
-                        None => Assignment::Divert { to: nearest_safe(&pos) },
+                        None => fallback(&pos, &home),
                     };
                 }
             } else {
@@ -324,6 +340,7 @@ impl Engagements {
                     eng.shots.push(Shot {
                         id: Uuid::new_v4(),
                         position: radar.spec().position.clone(),
+                        home: radar.spec().position.clone(),
                         assignment: Assignment::Target { id: t.id, locked: false },
                     });
                     eng.ammo -= 1;

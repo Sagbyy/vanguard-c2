@@ -15,7 +15,7 @@ use vanguard_core::{
     ThreatDestroyed, report_subject,
 };
 
-use crate::engagement::{Engagements, SAFE_ZONES};
+use crate::engagement::Engagements;
 
 const DEFAULT_NATS_URL: &str = "nats://127.0.0.1:4222";
 /// Distance at which an interceptor's seeker recognises real-vs-decoy (terminal).
@@ -97,10 +97,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
 
                 // Publish the firing picture + in-flight interceptors.
+                // Diverting interceptors return to base (within their platform's
+                // range), so the safe areas are the platform positions themselves.
                 let report = EngagementReport {
                     lines: engagements.lines(),
                     neutralized: engagements.neutralized,
-                    safe_zones: SAFE_ZONES.to_vec(),
+                    safe_zones: radars.values().map(|r| r.spec().position.clone()).collect(),
                 };
                 if let Ok(payload) = serde_json::to_vec(&report) {
                     let _ = client.publish(ENGAGEMENTS, payload.into()).await;
