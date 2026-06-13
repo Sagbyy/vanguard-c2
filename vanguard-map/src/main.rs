@@ -5,7 +5,7 @@ use rand::{Rng, SeedableRng};
 use uuid::Uuid;
 use vanguard_core::{Position, THREATS_SUBJECT, Threat};
 
-const WORLD_RADIUS: f64 = 70_000.0; // ingress ring, well outside every radar bubble
+const WORLD_RADIUS: f64 = 50_000.0; // ingress ring, well outside every radar bubble
 const TICK: std::time::Duration = std::time::Duration::from_millis(500);
 const SPAWN_EVERY_TICKS: u64 = 24; // one threat every 12 s
 const PUBLISH_EVERY_TICKS: u64 = 2; // ground truth published every second
@@ -82,10 +82,11 @@ fn spawn_threat(rng: &mut StdRng) -> Threat {
     // 180 km/h (classic Shahed-136 cruise) up to 300 km/h (modernized
     // Geran-2 variants) — plus some cruise-missile-class fast movers
     // (~800-950 km/h, Kalibr/Kh-101 class).
+    // Speeds doubled on purpose for demo pacing.
     let (speed, threat_level) = if rng.gen_bool(0.7) {
-        (rng.gen_range(50.0..85.0), rng.gen_range(2..5))
+        (rng.gen_range(100.0..170.0), rng.gen_range(2..5))
     } else {
-        (rng.gen_range(220.0..265.0), rng.gen_range(4..6))
+        (rng.gen_range(440.0..530.0), rng.gen_range(4..6))
     };
 
     Threat {
