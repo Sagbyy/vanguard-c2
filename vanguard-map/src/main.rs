@@ -1,4 +1,5 @@
 use std::f64::consts::TAU;
+use std::time::Instant;
 
 use futures::StreamExt;
 use rand::rngs::StdRng;
@@ -41,13 +42,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut actives: Vec<Active> = Vec::new();
     let mut config = MapConfig::default();
     let mut ticker = tokio::time::interval(TICK);
+    // Skip (don't burst) missed ticks: if the loop is busy handling a flood of
+    // events, we re-align to the period instead of firing several ticks at once.
+    ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
     let mut last_swarm_t = f64::NEG_INFINITY;
 
-    let dt = TICK.as_secs_f64();
     // Sim time and tick count advance ONLY on ticker ticks — config messages
-    // must never move the clock (a slider drag floods config updates).
+    // must never move the clock (a slider drag floods config updates). The clock
+    // tracks REAL elapsed wall time (× time_scale) so scheduling jitter or event
+    // bursts can never make threats jump ahead.
     let mut t = 0.0f64;
     let mut ticks = 0u64;
+    let mut last_tick = Instant::now();
     loop {
         tokio::select! {
             _ = ticker.tick() => {}
@@ -76,8 +82,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
         // Accelerated sim time: threats, spawns and movement run `time_scale`×
-        // faster in real time. `ticks` stays real (drives the publish cadence).
-        let sdt = dt * config.time_scale.max(0.0);
+        // faster in real time. Advance by REAL elapsed time (capped, so a stall
+        // can't teleport threats), never by a fixed per-tick amount.
+        let real_dt = last_tick.elapsed().as_secs_f64().min(0.5);
+        last_tick = Instant::now();
+        let sdt = real_dt * config.time_scale.max(0.0);
         t += sdt;
         ticks += 1;
 

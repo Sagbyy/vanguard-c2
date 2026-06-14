@@ -134,7 +134,10 @@ test asserts the fused track beats a single raw measurement.)
 On each tick the engine slowly resupplies ammunition, estimates threat velocity, lets the
 interceptor seekers recognize decoys in the terminal phase, then globally re-optimizes the
 **interceptors+tubes × threats** assignment with the **Hungarian algorithm**
-(`pathfinding::kuhn_munkres`) using anti-oscillation hysteresis.
+(`pathfinding::kuhn_munkres`) using anti-oscillation hysteresis. Each interceptor–threat
+pair is scored by `engage_value` = **danger level** + **proximity to the defended asset** −
+**flight distance** (and only inside the platform's range), so higher-level, closer threats
+are engaged first.
 
 ```mermaid
 flowchart TD
@@ -158,24 +161,26 @@ not where it is.
 
 ### In-flight interceptor decision hierarchy
 
-An interceptor is never wasted: it only diverts (RTB) as a last resort, and an automatic
-divert can **re-engage** a fresh UAV that enters range. Only a **manual abort** is sticky.
+**Hard constraint: an interceptor never leaves its launching platform's range circle** — it
+only ever pursues targets *inside* that range, and its flight is clamped to the range
+boundary as a safety net. It is never wasted: it only diverts as a last resort, and an
+automatic divert can **re-engage** a fresh in-range UAV. Only a **manual abort** is sticky.
 
 ```mermaid
 flowchart TD
-    S["Interceptor in flight"] --> Q1{"Engageable target assigned<br/>by the Hungarian?"}
+    S["Interceptor in flight"] --> Q1{"In-range target assigned<br/>by the Hungarian?"}
     Q1 -- yes --> ENG["Fly to PIP → impact"]
-    Q1 -- no --> Q2{"Nearest live non-decoy<br/>threat?<br/>(real or unidentified)"}
+    Q1 -- no --> Q2{"Nearest in-range non-decoy<br/>threat?<br/>(real or unidentified)"}
     Q2 -- yes --> RA["Re-assign onto that threat"]
-    Q2 -- no --> Q3{"Nearest recognized<br/>decoy?"}
+    Q2 -- no --> Q3{"Nearest in-range<br/>recognized decoy?"}
     Q3 -- yes --> DEC["Last resort:<br/>detonate on the decoy"]
-    Q3 -- no --> RTB["RTB: return to its base<br/>+ self-destruct"]
-    RTB -. "a UAV enters range" .-> Q1
-    ENG -. "operator ABORT" .-> AB["Manual divert (RTB)<br/>not re-engageable"]
+    Q3 -- no --> RTB["Divert to safe drop zone<br/>(in range) + self-destruct"]
+    RTB -. "an in-range UAV appears" .-> Q1
+    ENG -. "operator ABORT" .-> AB["Manual divert<br/>not re-engageable"]
 ```
 
-Since an interceptor cannot fly beyond its platform's range, the **safe zone is its own
-base** (RTB) — always reachable, unlike a far-off point out of range.
+The **safe drop zone** is a point offset from the platform, inside its range (a random
+bearing at 40 % of the range) — always reachable, never on top of the base.
 
 ## Stack
 
@@ -186,6 +191,29 @@ base** (RTB) — always reachable, unlike a far-off point out of range.
 - **webui**: React 19 + TypeScript + Vite + MapLibre GL + Tailwind, [`nats.ws`](https://github.com/nats-io/nats.ws) over a WebSocket NATS listener
 
 ## Getting started
+
+### Option A — Docker Compose (one command)
+
+The whole stack (NATS + map + control + dashboard) in one go:
+
+```bash
+docker compose up --build
+# then open http://localhost:5173
+```
+
+That builds the two Rust binaries and the dashboard, starts the NATS broker
+(`nats.conf`: TCP 4222 + WebSocket 8080), and wires everything together. The
+browser talks to NATS directly over `ws://localhost:8080`. Stop with `Ctrl-C`
+(or `docker compose down`). The services are defined in `docker-compose.yml`:
+
+| Service | Image | Role |
+|---|---|---|
+| `nats` | `nats:latest` | broker (4222 TCP + 8080 WebSocket) |
+| `map` | `edth-backend` (`Dockerfile`) | ground-truth simulation |
+| `control` | `edth-backend` (`Dockerfile`) | platform host + engagement engine |
+| `webui` | `webui/Dockerfile` (nginx) | C2 dashboard on `:5173` |
+
+### Option B — Run from source
 
 Everything to go from scratch:
 
@@ -203,8 +231,10 @@ cargo test               # workspace tests
 cargo clippy --workspace # lint
 cargo fmt --check        # formatting
 
-# 4. Start the NATS broker (terminal 1) — required by the map and the platforms
-docker run -p 4222:4222 nats:latest
+# 4. Start the NATS broker (terminal 1) — TCP 4222 for the binaries + WebSocket
+#    8080 for the dashboard (nats.conf enables both).
+docker run -p 4222:4222 -p 8080:8080 \
+  -v "$PWD/nats.conf:/etc/nats/nats.conf:ro" nats:latest -c /etc/nats/nats.conf
 
 # 5. Run the map (terminal 2): ground truth, publishes threats on NATS
 cargo run -p vanguard-map

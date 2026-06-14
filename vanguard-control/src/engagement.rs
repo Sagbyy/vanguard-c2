@@ -40,9 +40,11 @@ const REACHABLE_BASE: i64 = 100_000;
 const UNREACHABLE: i64 = -1_000_000;
 const HYST_BONUS: i64 = 5_000;
 const URGENCY_SPAN: f64 = 60_000.0;
+/// Weight of a threat's danger level in the assignment value. ~1 level ≈ 10 km
+/// of proximity-urgency, so danger is prioritised but a much closer threat still
+/// wins on imminence.
+const LEVEL_WEIGHT: i64 = 1_000;
 
-/// Designated safe drop zones (empty areas well outside the city). An aborted
-/// interceptor self-destructs at the nearest one.
 enum Assignment {
     Target { id: Uuid, locked: bool },
     /// Returning to base to self-destruct. `manual` = operator-aborted, so it is
@@ -54,9 +56,12 @@ enum Assignment {
 struct Shot {
     id: Uuid,
     position: Position,
-    /// Launching platform position — the reachable safe point a divert flies to
-    /// (an interceptor cannot fly beyond its own platform's range).
+    /// Safe drop zone (offset from the platform, within range) a divert flies to.
     home: Position,
+    /// Launching platform center and range. An interceptor must NEVER leave this
+    /// circle: it only pursues targets inside it, and its flight is clamped to it.
+    base: Position,
+    reach: f64,
     assignment: Assignment,
 }
 
@@ -65,6 +70,16 @@ struct Engager {
     capacity: usize,
     reload_accum: f64,
     shots: Vec<Shot>,
+}
+
+/// An in-flight, re-taskable interceptor, with the platform range it must stay in.
+#[derive(Clone)]
+struct Mover {
+    id: Uuid,
+    pos: Position,
+    home: Position,
+    base: Position,
+    reach: f64,
 }
 
 #[derive(Default)]
@@ -210,7 +225,6 @@ impl Engagements {
                             return false;
                         }
                         shot.position = shot.position.step_toward(&to, step);
-                        true
                     }
                     Ok(id) => {
                         let Some(threat) = by_id.get(&id) else { return false };
@@ -222,9 +236,13 @@ impl Engagements {
                         let aim = predicted_intercept(&shot.position, int_speed, &threat.position, &v)
                             .unwrap_or_else(|| threat.position.clone());
                         shot.position = shot.position.step_toward(&aim, step);
-                        true
                     }
                 }
+                // Hard constraint: never leave the launching platform's range.
+                if shot.position.distance(&shot.base) > shot.reach {
+                    shot.position = shot.base.clone().step_toward(&shot.position, shot.reach);
+                }
+                true
             });
         }
         self.neutralized += destroyed.len();
@@ -242,9 +260,10 @@ impl Engagements {
             })
             .collect();
 
-        // (shot_id, position, home). An auto-diverting interceptor is re-taskable:
-        // a fresh threat entering range pulls it back. A manual abort is not.
-        let mut movers: Vec<(Uuid, Position, Position)> = Vec::new();
+        // An auto-diverting interceptor is re-taskable: a fresh threat entering
+        // range pulls it back. A manual abort is not. Each mover carries its
+        // platform base+range so it is only ever matched to in-range targets.
+        let mut movers: Vec<Mover> = Vec::new();
         let mut tubes: Vec<Uuid> = Vec::new();
         for (pid, e) in &self.engagers {
             for s in &e.shots {
@@ -253,7 +272,13 @@ impl Engagements {
                     Assignment::Target { locked: false, .. } | Assignment::Divert { manual: false, .. }
                 );
                 if retaskable {
-                    movers.push((s.id, s.position.clone(), s.home.clone()));
+                    movers.push(Mover {
+                        id: s.id,
+                        pos: s.position.clone(),
+                        home: s.home.clone(),
+                        base: s.base.clone(),
+                        reach: s.reach,
+                    });
                 }
             }
             let capacity = MAX_IN_FLIGHT.saturating_sub(e.shots.len()).min(e.ammo);
@@ -277,30 +302,31 @@ impl Engagements {
             .filter(|t| engageable.contains(&t.id) && !locked_targets.contains(&t.id))
             .collect();
         // Fallback for an in-flight interceptor the Hungarian leaves unmatched.
-        // Priority: nearest non-decoy threat (real OR not-yet-identified, even if
-        // out of radar range) > nearest recognised decoy (last resort) > RTB.
+        // Strictly within the platform's range: nearest in-range non-decoy
+        // threat > nearest in-range recognised decoy (last resort) > RTB.
         let is_decoy = |t: &&Threat| matches!(self.recognized.get(&t.id), Some(ThreatClassification::Decoy));
         let nondecoy: Vec<(Uuid, Position)> =
             threats.iter().filter(|t| !is_decoy(t)).map(|t| (t.id, t.position.clone())).collect();
         let decoys: Vec<(Uuid, Position)> =
             threats.iter().filter(is_decoy).map(|t| (t.id, t.position.clone())).collect();
-        let nearest = |pool: &[(Uuid, Position)], pos: &Position| {
-            pool.iter()
-                .min_by(|a, b| pos.distance(&a.1).total_cmp(&pos.distance(&b.1)))
-                .map(|(id, _)| *id)
-        };
-        let fallback = |pos: &Position, home: &Position| {
-            nearest(&nondecoy, pos)
-                .or_else(|| nearest(&decoys, pos))
+        let fallback = |m: &Mover| {
+            let nearest_in_range = |pool: &[(Uuid, Position)]| {
+                pool.iter()
+                    .filter(|(_, p)| m.base.distance(p) <= m.reach)
+                    .min_by(|a, b| m.pos.distance(&a.1).total_cmp(&m.pos.distance(&b.1)))
+                    .map(|(id, _)| *id)
+            };
+            nearest_in_range(&nondecoy)
+                .or_else(|| nearest_in_range(&decoys))
                 .map(|id| Assignment::Target { id, locked: false })
-                .unwrap_or_else(|| Assignment::Divert { to: home.clone(), manual: false })
+                .unwrap_or_else(|| Assignment::Divert { to: m.home.clone(), manual: false })
         };
 
         if (movers.is_empty() && tubes.is_empty()) || targets.is_empty() {
             // No engageable target: free movers fall back (non-decoy > decoy > RTB).
-            for (sid, pos, home) in &movers {
-                let assignment = fallback(pos, home);
-                if let Some(shot) = self.shot_mut(*sid) {
+            for m in &movers {
+                let assignment = fallback(m);
+                if let Some(shot) = self.shot_mut(m.id) {
                     shot.assignment = assignment;
                 }
             }
@@ -314,9 +340,13 @@ impl Engagements {
                     .map(|j| {
                         let Some(threat) = targets.get(j) else { return 0 };
                         if i < movers.len() {
-                            let (sid, pos, _) = &movers[i];
-                            let keep = mover_target.get(sid) == Some(&threat.id);
-                            engage_value(pos, threat) + if keep { HYST_BONUS } else { 0 }
+                            let m = &movers[i];
+                            if m.base.distance(&threat.position) > m.reach {
+                                UNREACHABLE
+                            } else {
+                                let keep = mover_target.get(&m.id) == Some(&threat.id);
+                                engage_value(&m.pos, threat) + if keep { HYST_BONUS } else { 0 }
+                            }
                         } else if i - movers.len() < tubes.len() {
                             self.tube_value(radars, &tubes[i - movers.len()], threat)
                         } else {
@@ -331,11 +361,14 @@ impl Engagements {
         for (i, &j) in assignment.iter().enumerate() {
             let threat = targets.get(j).copied();
             if i < movers.len() {
-                let (sid, pos, home) = movers[i].clone();
-                if let Some(shot) = self.shot_mut(sid) {
+                let m = movers[i].clone();
+                if let Some(shot) = self.shot_mut(m.id) {
                     shot.assignment = match threat {
-                        Some(t) => Assignment::Target { id: t.id, locked: false },
-                        None => fallback(&pos, &home),
+                        // Only commit to a target that is inside this platform's range.
+                        Some(t) if m.base.distance(&t.position) <= m.reach => {
+                            Assignment::Target { id: t.id, locked: false }
+                        }
+                        _ => fallback(&m),
                     };
                 }
             } else {
@@ -353,6 +386,8 @@ impl Engagements {
                         id: Uuid::new_v4(),
                         position: radar.spec().position.clone(),
                         home: safe_point(radar.spec()),
+                        base: radar.spec().position.clone(),
+                        reach: radar.spec().reach,
                         assignment: Assignment::Target { id: t.id, locked: false },
                     });
                     eng.ammo -= 1;
@@ -419,5 +454,6 @@ fn classify(threat: &Threat) -> ThreatClassification {
 fn engage_value(from: &Position, threat: &Threat) -> i64 {
     let to_asset = (threat.position.x * threat.position.x + threat.position.y * threat.position.y).sqrt();
     let urgency = (URGENCY_SPAN - to_asset).max(0.0) as i64;
-    REACHABLE_BASE + urgency / 10 - (from.distance(&threat.position) as i64) / 10
+    REACHABLE_BASE + urgency / 10 + threat.threat_level as i64 * LEVEL_WEIGHT
+        - (from.distance(&threat.position) as i64) / 10
 }

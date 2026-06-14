@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ControlPanel } from './ControlPanel'
+import { SeekerFeed } from './SeekerFeed'
 import { type Basemap, TacticalMap } from './TacticalMap'
 import {
   ammoLabel,
@@ -146,6 +147,14 @@ export default function App() {
   const statusStyle = STATUS_STYLE[status]
   const clock = new Date(now).toISOString().slice(11, 19)
 
+  // Onboard seeker camera: the selected interceptor + the target it is chasing.
+  const selectedIcptr = selectedInterceptor
+    ? (interceptors.find((i) => i.id === selectedInterceptor) ?? null)
+    : null
+  const selectedTarget = selectedIcptr
+    ? (threats.find((t) => t.id === selectedIcptr.target_id) ?? null)
+    : null
+
   return (
     <div className="flex h-full flex-col bg-[#04070b] text-slate-200">
       <header className="flex items-center gap-6 border-b border-cyan-400/15 bg-[#070d13] px-4 py-2">
@@ -229,6 +238,13 @@ export default function App() {
                 ✕
               </button>
             </div>
+          )}
+          {selectedInterceptor && (
+            <SeekerFeed
+              interceptor={selectedIcptr}
+              target={selectedTarget}
+              onClose={() => setSelectedInterceptor(null)}
+            />
           )}
         </main>
 

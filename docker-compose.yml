@@ -1,0 +1,44 @@
+# One-command launch of the whole stack:
+#   docker compose up --build
+# Then open http://localhost:5173
+#
+# Flow: vanguard-map → NATS → vanguard-control → NATS → webui (browser).
+# The browser connects straight to the NATS WebSocket on localhost:8080.
+
+services:
+  nats:
+    image: nats:latest
+    command: ["-c", "/etc/nats/nats.conf"]
+    volumes:
+      - ./nats.conf:/etc/nats/nats.conf:ro
+    ports:
+      - "4222:4222"   # TCP, for the Rust binaries
+      - "8080:8080"   # WebSocket, for the browser dashboard
+
+  map:
+    build: .
+    image: edth-backend:latest
+    command: ["vanguard-map"]
+    environment:
+      NATS_URL: nats://nats:4222
+    depends_on:
+      - nats
+    restart: unless-stopped
+
+  control:
+    build: .
+    image: edth-backend:latest
+    command: ["vanguard-control"]
+    environment:
+      NATS_URL: nats://nats:4222
+      RECOGNITION_RANGE_M: "4000"
+    depends_on:
+      - nats
+    restart: unless-stopped
+
+  webui:
+    build: ./webui
+    ports:
+      - "5173:80"
+    depends_on:
+      - nats

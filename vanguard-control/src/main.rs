@@ -190,7 +190,7 @@ fn kyiv_preset() -> Vec<PlatformSpec> {
     ];
 
     ring.iter()
-        .map(|&(name, x, y)| spec(name, x, y, 20_000.0, 6))
+        .map(|&(name, x, y)| spec(name, x, y, 20_000.0, 40))
         .collect()
 }
 
