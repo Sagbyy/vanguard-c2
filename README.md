@@ -215,7 +215,15 @@ browser talks to NATS directly over `ws://localhost:8080`. Stop with `Ctrl-C`
 
 ### Option B — Run from source
 
-Everything to go from scratch:
+Once the toolchain is installed (see below), the quickest local loop is the dev
+script — it starts NATS + map + control + dashboard and stops them all on `Ctrl-C`
+(Rust builds incrementally, the dashboard runs with hot reload):
+
+```bash
+./dev.sh        # then open http://localhost:5173
+```
+
+Or do it by hand:
 
 ```bash
 # 1. Rust toolchain (once per machine) — edition 2024 → rustc >= 1.85
