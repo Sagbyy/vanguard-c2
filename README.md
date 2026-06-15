@@ -1,4 +1,6 @@
-# EDTH Drone — Distributed interceptor coordination
+# Vanguard C2 — Distributed interceptor coordination
+
+![Vanguard Screen](/docs/images/vanguard-screen.png)
 
 Real-time air-defense system: several interception platforms share their detections, and a
 central decision engine fuses tracks, prioritizes threats and assigns targets optimally — to
@@ -104,17 +106,17 @@ flowchart TB
     TEST -. drives in-process .-> ORCH
 ```
 
-| Crate | Kind | Role |
-|---|---|---|
-| `vanguard-core` | lib | Shared serde models, NATS subjects, radar, Kalman fusion, PIP solver |
-| `vanguard-map` | bin | Ground-truth simulation (spawns, movement, leakers) — **demo** |
-| `vanguard-control` | bin | Hosts all platform radars + the engagement engine (Hungarian/PIP) — **demo** |
-| `webui` | — | React + MapLibre C2 dashboard — **demo** |
-| `vanguard-platform` | bin+lib | One interception platform (sensors + effector); bundles `vanguard-interceptor` |
-| `vanguard-interceptor` | bin+lib | Autonomous interceptor (munition) agent |
-| `vanguard-orchestrator` | bin+lib | Track fusion + weapon-target assignment over the `vanguard.*` bus |
-| `vanguard-system-interceptor` | bin | Single-platform launcher via clap CLI |
-| `vanguard-test` (`vanguard-simulation`) | bin | Integration harness wiring platform + orchestrator + interceptor |
+| Crate                                   | Kind    | Role                                                                           |
+| --------------------------------------- | ------- | ------------------------------------------------------------------------------ |
+| `vanguard-core`                         | lib     | Shared serde models, NATS subjects, radar, Kalman fusion, PIP solver           |
+| `vanguard-map`                          | bin     | Ground-truth simulation (spawns, movement, leakers) — **demo**                 |
+| `vanguard-control`                      | bin     | Hosts all platform radars + the engagement engine (Hungarian/PIP) — **demo**   |
+| `webui`                                 | —       | React + MapLibre C2 dashboard — **demo**                                       |
+| `vanguard-platform`                     | bin+lib | One interception platform (sensors + effector); bundles `vanguard-interceptor` |
+| `vanguard-interceptor`                  | bin+lib | Autonomous interceptor (munition) agent                                        |
+| `vanguard-orchestrator`                 | bin+lib | Track fusion + weapon-target assignment over the `vanguard.*` bus              |
+| `vanguard-system-interceptor`           | bin     | Single-platform launcher via clap CLI                                          |
+| `vanguard-test` (`vanguard-simulation`) | bin     | Integration harness wiring platform + orchestrator + interceptor               |
 
 ## Algorithms
 
@@ -156,13 +158,13 @@ flowchart TD
 ```
 
 The **Predicted Intercept Point (PIP)** — `vanguard_core::predicted_intercept` — solves the
-quadratic `|target + v·t − shooter| = speed·t` to aim ahead at where the threat *will be*,
+quadratic `|target + v·t − shooter| = speed·t` to aim ahead at where the threat _will be_,
 not where it is.
 
 ### In-flight interceptor decision hierarchy
 
 **Hard constraint: an interceptor never leaves its launching platform's range circle** — it
-only ever pursues targets *inside* that range, and its flight is clamped to the range
+only ever pursues targets _inside_ that range, and its flight is clamped to the range
 boundary as a safety net. It is never wasted: it only diverts as a last resort, and an
 automatic divert can **re-engage** a fresh in-range UAV. Only a **manual abort** is sticky.
 
@@ -206,12 +208,12 @@ That builds the two Rust binaries and the dashboard, starts the NATS broker
 browser talks to NATS directly over `ws://localhost:8080`. Stop with `Ctrl-C`
 (or `docker compose down`). The services are defined in `docker-compose.yml`:
 
-| Service | Image | Role |
-|---|---|---|
-| `nats` | `nats:latest` | broker (4222 TCP + 8080 WebSocket) |
-| `map` | `edth-backend` (`Dockerfile`) | ground-truth simulation |
-| `control` | `edth-backend` (`Dockerfile`) | platform host + engagement engine |
-| `webui` | `webui/Dockerfile` (nginx) | C2 dashboard on `:5173` |
+| Service   | Image                         | Role                               |
+| --------- | ----------------------------- | ---------------------------------- |
+| `nats`    | `nats:latest`                 | broker (4222 TCP + 8080 WebSocket) |
+| `map`     | `edth-backend` (`Dockerfile`) | ground-truth simulation            |
+| `control` | `edth-backend` (`Dockerfile`) | platform host + engagement engine  |
+| `webui`   | `webui/Dockerfile` (nginx)    | C2 dashboard on `:5173`            |
 
 ### Option B — Run from source
 
@@ -345,11 +347,11 @@ alpha RADAR CONTACT threat becf8dfa at (-172, -2167) — range 1492 m
 alpha radar: becf8dfa at 1492 m
 ```
 
-| Option | Role | Default |
-|---|---|---|
-| `--name` | platform name | required |
-| `-n`, `--interceptors` | number of interceptors (rounds) carried | 4 |
-| `-x`, `-y` | position in meters | 0.0 |
+| Option                 | Role                                    | Default  |
+| ---------------------- | --------------------------------------- | -------- |
+| `--name`               | platform name                           | required |
+| `-n`, `--interceptors` | number of interceptors (rounds) carried | 4        |
+| `-x`, `-y`             | position in meters                      | 0.0      |
 
 The platform id and each interceptor id are v4 UUIDs generated at launch.
 
