@@ -28,7 +28,12 @@ impl TrackFuser {
     /// the ground-truth threats with their position replaced by the fused
     /// estimate. `sdt` is simulated dt (real dt × time_scale), matching how far
     /// the threats actually moved this tick.
-    pub fn fuse(&mut self, truth: &[Threat], reports: &[InterceptorReport], sdt: f64) -> Vec<Threat> {
+    pub fn fuse(
+        &mut self,
+        truth: &[Threat],
+        reports: &[InterceptorReport],
+        sdt: f64,
+    ) -> Vec<Threat> {
         if sdt > 0.0 {
             for track in self.tracks.values_mut() {
                 track.predict(sdt);
@@ -62,7 +67,10 @@ impl TrackFuser {
             .map(|t| match self.tracks.get(&t.id) {
                 Some(track) => {
                     let (x, y) = track.position();
-                    Threat { position: Position { x, y }, ..t.clone() }
+                    Threat {
+                        position: Position { x, y },
+                        ..t.clone()
+                    }
                 }
                 // Never measured (out of every radar's range): keep ground truth.
                 None => t.clone(),
@@ -110,7 +118,11 @@ mod tests {
     #[test]
     fn fusion_reduces_position_error() {
         let tid = Uuid::from_u128(1);
-        let plats = [Uuid::from_u128(10), Uuid::from_u128(11), Uuid::from_u128(12)];
+        let plats = [
+            Uuid::from_u128(10),
+            Uuid::from_u128(11),
+            Uuid::from_u128(12),
+        ];
         let mut fuser = TrackFuser::default();
         let (dt, speed) = (0.25, 120.0);
 
@@ -151,6 +163,9 @@ mod tests {
 
         let raw_mean = raw_err / raw_n;
         let fused_mean = fused_err / fused_n;
-        assert!(fused_mean < raw_mean, "fused {fused_mean:.2} m should beat raw {raw_mean:.2} m");
+        assert!(
+            fused_mean < raw_mean,
+            "fused {fused_mean:.2} m should beat raw {raw_mean:.2} m"
+        );
     }
 }

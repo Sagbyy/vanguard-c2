@@ -4,6 +4,7 @@ pub mod interceptor;
 pub mod kalman;
 pub mod position;
 pub mod radar;
+pub mod solver;
 pub mod subjects;
 pub mod threat;
 
@@ -22,6 +23,7 @@ pub use interceptor::{
 };
 pub use position::{Position, Speed, predicted_intercept};
 pub use radar::Radar;
+pub use solver::{SOLVE_ASSIGNMENT, SolveArc, SolveRequest, SolveResponse};
 pub use threat::Threat;
 pub use uuid::Uuid;
 

@@ -252,10 +252,17 @@ cargo run -p vanguard-map
 # 6. Run the platform host (single process): starts with the Kyiv preset
 #    (7 perimeter platforms, 20 km range). You then add/remove/place
 #    platforms from the dashboard. This process also DECIDES the firing
-#    (Hungarian assignment) and executes it.
+#    (min-cost-flow assignment, see step 6b) and executes it.
 #    RECOGNITION_RANGE_M (default 4000) = range at which an interceptor's
 #    seeker tells a real threat from a decoy (terminal phase).
 cargo run -p vanguard-control
+
+# 6b. (optional) OR-Tools assignment sidecar. The host ships the firing
+#     assignment as a min-cost-flow problem on `control.solve.assignment`;
+#     this Python service solves it with the real OR-Tools library and
+#     answers over NATS. If it is NOT running, the host falls back to its
+#     in-process Hungarian solver — so this step is optional. See solver/.
+cd solver && pip install -r requirements.txt && python solver.py
 
 # 7. The web dashboard (real map centered on Kyiv + control panel)
 cd webui && pnpm install && pnpm dev    # http://localhost:5173
@@ -273,9 +280,13 @@ baseline scenario. Everything goes through NATS: the UI publishes on `control.ma
 ### Recognition & engagement, in prose
 
 Platforms **detect only** (every contact is `Unknown` — they do not tell real from decoy).
-`vanguard-control` assigns the detected contacts with the Hungarian algorithm (in-flight
-interceptors + free tubes × contacts), with hysteresis for dynamic re-tasking (never two
-shots on the same threat, never a good shot wasted). Each tube launches a **real
+`vanguard-control` assigns the detected contacts as a **min-cost flow** (in-flight
+interceptors + free tubes × contacts), with hysteresis for dynamic re-tasking. The flow
+graph encodes the real constraints structurally: **range** as a present/absent arc (an
+out-of-reach pair simply has no edge), **ammo/reload** as the number of launch slots per
+platform, and **saturation** as a per-target capacity (the top-tier threats, level ≥ 5,
+accept two interceptors). The graph is solved by the OR-Tools sidecar (step 6b) when it is
+up, or by an in-process Hungarian solver as a fallback. Each tube launches a **real
 interceptor** that flies to its PIP.
 
 The **interceptor's seeker recognizes** real vs decoy in the **terminal phase** once within

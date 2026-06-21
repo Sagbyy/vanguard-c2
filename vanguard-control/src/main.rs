@@ -3,6 +3,7 @@
 
 mod engagement;
 mod fusion;
+mod solver;
 
 use std::collections::{HashMap, HashSet};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -18,6 +19,7 @@ use vanguard_core::{
 
 use crate::engagement::Engagements;
 use crate::fusion::TrackFuser;
+use crate::solver::Solver;
 
 const DEFAULT_NATS_URL: &str = "nats://127.0.0.1:4222";
 /// Distance at which an interceptor's seeker recognises real-vs-decoy (terminal).
@@ -31,6 +33,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .and_then(|v| v.parse().ok())
         .unwrap_or(RECOGNITION_RANGE);
     let client = async_nats::connect(&nats_url).await?;
+    let solver = Solver::new(client.clone());
     let mut threats_sub = client.subscribe(THREATS_SUBJECT).await?;
     let mut add_sub = client.subscribe(PLATFORM_ADD).await?;
     let mut remove_sub = client.subscribe(PLATFORM_REMOVE).await?;
@@ -98,7 +101,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                 // Fly interceptors, recognise, resolve impacts, assign new shots.
                 let by_id: HashMap<Uuid, &Threat> = fused.iter().map(|t| (t.id, t)).collect();
-                for tid in engagements.step(&radars, &fused, &engageable, dt, time_scale, recognition_range) {
+                for tid in engagements.step(&radars, &fused, &engageable, dt, time_scale, recognition_range, &solver).await {
                     println!("NEUTRALIZED {} (total {})", &tid.to_string()[..8], engagements.neutralized);
                     let position = by_id.get(&tid).map(|t| t.position.clone()).unwrap_or(Position { x: 0.0, y: 0.0 });
                     let event = ThreatDestroyed { id: tid, position };

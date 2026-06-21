@@ -34,7 +34,10 @@ pub struct Radar {
 
 impl Radar {
     pub fn new(spec: PlatformSpec) -> Self {
-        Self { spec, last_seen: HashMap::new() }
+        Self {
+            spec,
+            last_seen: HashMap::new(),
+        }
     }
 
     pub fn spec(&self) -> &PlatformSpec {
@@ -56,7 +59,8 @@ impl Radar {
             let seed = (self.spec.id.as_u128() as u64) ^ (threat.id.as_u128() as u64) ^ now_ms;
             let measured = Position {
                 x: threat.position.x + jitter(seed) * MEASUREMENT_NOISE,
-                y: threat.position.y + jitter(seed.wrapping_mul(0x2545_F491_4F6C_DD1D)) * MEASUREMENT_NOISE,
+                y: threat.position.y
+                    + jitter(seed.wrapping_mul(0x2545_F491_4F6C_DD1D)) * MEASUREMENT_NOISE,
             };
 
             let speed = match self.last_seen.get(&threat.id) {
