@@ -16,10 +16,10 @@ export function Slider({
   onChange: (v: number) => void
 }) {
   return (
-    <label className="block text-[11px] text-slate-400">
+    <label className="block text-[11px] text-neutral-400">
       <div className="mb-0.5 flex justify-between">
         <span>{label}</span>
-        <span className="text-slate-200">{fmt(value)}</span>
+        <span className="text-neutral-200">{fmt(value)}</span>
       </div>
       <input
         type="range"
@@ -28,7 +28,7 @@ export function Slider({
         step={step}
         value={value}
         onChange={(e) => onChange(Number(e.target.value))}
-        className="w-full accent-cyan-400"
+        className="w-full accent-neutral-200"
       />
     </label>
   )

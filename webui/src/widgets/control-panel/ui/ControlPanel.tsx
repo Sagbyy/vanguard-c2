@@ -72,13 +72,13 @@ export function ControlPanel({
   }
 
   return (
-    <section className="border border-cyan-400/15 bg-cyan-400/[0.03] p-3">
+    <section className="border border-white/10 bg-white/[0.02] p-3">
       <div className="mb-2 flex items-center justify-between">
-        <h2 className="text-[10px] font-bold tracking-[0.3em] text-cyan-400/80">
+        <h2 className="text-[10px] font-bold tracking-[0.3em] text-neutral-500">
           SIMULATION CONTROL
         </h2>
         <button type="button" onClick={doReset}
-          className="border border-amber-400/40 px-2 py-0.5 text-[10px] font-bold tracking-widest text-amber-300 hover:bg-amber-400/10">
+          className="border border-white/20 px-2 py-0.5 text-[10px] font-bold tracking-widest text-neutral-300 hover:bg-white/10">
           ↺ RESET
         </button>
       </div>
@@ -107,7 +107,7 @@ export function ControlPanel({
           onChange={(v) => pushConfig({ ...cfg, max_active: v })} />
       </div>
 
-      <h2 className="mt-4 mb-2 text-[10px] font-bold tracking-[0.3em] text-emerald-400/80">
+      <h2 className="mt-4 mb-2 text-[10px] font-bold tracking-[0.3em] text-emerald-400/70">
         ADD PLATFORM
       </h2>
       <button
@@ -115,22 +115,22 @@ export function ControlPanel({
         onClick={() => setPlacing(!placing)}
         className={`w-full border px-2 py-1 text-[11px] font-bold tracking-widest ${
           placing
-            ? 'border-amber-400 text-amber-300'
-            : 'border-emerald-400/40 text-emerald-300 hover:bg-emerald-400/10'
+            ? 'border-white bg-white/10 text-neutral-100'
+            : 'border-white/25 text-neutral-200 hover:bg-white/10'
         }`}
       >
         {placing ? 'CLICK MAP TO PLACE…' : 'PLACE ON MAP'}
       </button>
 
       {pending && (
-        <div className="mt-2 flex flex-col gap-1.5 text-[11px] text-slate-400">
-          <span className="text-slate-300">
+        <div className="mt-2 flex flex-col gap-1.5 text-[11px] text-neutral-400">
+          <span className="text-neutral-300">
             @ ({(pending.x / 1000).toFixed(1)}, {(pending.y / 1000).toFixed(1)}) km
           </span>
           <label className="flex items-center justify-between gap-2">
             NAME
             <input value={name} onChange={(e) => setName(e.target.value)}
-              className="w-28 bg-black/40 px-1 text-slate-200 outline-none" />
+              className="w-28 border border-white/10 bg-white/5 px-1 text-neutral-200 outline-none focus:border-white/30" />
           </label>
           <Slider label="REACH" value={reachKm} min={3} max={30} step={1}
             fmt={(v) => `${v}km`} onChange={setReachKm} />
@@ -139,16 +139,16 @@ export function ControlPanel({
             AMMO
             <input type="number" min={0} step={1} value={ammo}
               onChange={(e) => setAmmo(Math.max(0, Math.floor(Number(e.target.value)) || 0))}
-              className="w-20 bg-black/40 px-1 text-right text-slate-200 outline-none" />
+              className="w-20 border border-white/10 bg-white/5 px-1 text-right text-neutral-200 outline-none focus:border-white/30" />
           </label>
 
           <div className="mt-1 flex gap-2">
             <button type="button" onClick={addPlatform}
-              className="flex-1 border border-emerald-400/40 px-2 py-1 font-bold tracking-widest text-emerald-300 hover:bg-emerald-400/10">
+              className="flex-1 border border-white/40 px-2 py-1 font-bold tracking-widest text-neutral-100 hover:bg-white/10">
               ADD
             </button>
             <button type="button" onClick={cancel}
-              className="flex-1 border border-slate-600 px-2 py-1 font-bold tracking-widest text-slate-400 hover:bg-slate-700/30">
+              className="flex-1 border border-white/15 px-2 py-1 font-bold tracking-widest text-neutral-400 hover:bg-white/5">
               CANCEL
             </button>
           </div>
@@ -159,12 +159,12 @@ export function ControlPanel({
         <div className="mt-3 flex flex-col gap-1">
           {platforms.map((view) => (
             <div key={view.report.platform_id}
-              className="flex items-center justify-between text-[11px] text-slate-400">
-              <span className="text-emerald-300">{view.report.name.toUpperCase()}</span>
-              <span className="text-slate-500">{(view.report.reach / 1000).toFixed(0)}km</span>
+              className="flex items-center justify-between text-[11px] text-neutral-400">
+              <span className="text-emerald-400/80">{view.report.name.toUpperCase()}</span>
+              <span className="text-neutral-500">{(view.report.reach / 1000).toFixed(0)}km</span>
               <button type="button"
                 onClick={() => removePlatform(view.report.platform_id)}
-                className="text-red-400 hover:text-red-300">
+                className="text-neutral-500 hover:text-neutral-100">
                 ✕
               </button>
             </div>
