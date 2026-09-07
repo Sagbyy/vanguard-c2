@@ -22,7 +22,7 @@ interface TacticalMapProps {
   onMapClick: (pos: Position) => void
   preview: { position: Position; reach: number } | null
   engagements: { platform_id: string; threat_id: string }[]
-  interceptors: { id: string; position: Position; diverting: boolean }[]
+  interceptors: { id: string; position: Position; target_id: string; diverting: boolean }[]
   bursts: { key: number; position: Position; kind: 'kill' | 'impact' }[]
   zoneRadius: number
   safeZones: Position[]
@@ -333,12 +333,8 @@ export function TacticalMap({
     if (!map || !ready) return
 
     const now = Date.now()
-    const trackedIds = new Set<string>()
-    for (const { report, lastSeen } of platforms) {
-      if (now - lastSeen <= STALE_AFTER_MS) {
-        for (const contact of report.threats) trackedIds.add(contact.id)
-      }
-    }
+    // A threat is "tracked" only when an interceptor is actively assigned to it.
+    const trackedIds = new Set(interceptors.map((it) => it.target_id))
 
     const ranges = platforms.map(({ report, lastSeen }) => ({
       type: 'Feature' as const,
@@ -416,7 +412,7 @@ export function TacticalMap({
 
       const classification = classifications.get(threat.id) ?? 'Unknown'
       const category = trackCategory(classification)
-      const size = 24 + threat.threat_level * 1.5
+      const size = 16 + threat.threat_level * 1.2
       const mil = el.querySelector('.mil') as HTMLElement
       const sig = `${classification}:${Math.round(size)}`
       if (mil.dataset.sig !== sig) {

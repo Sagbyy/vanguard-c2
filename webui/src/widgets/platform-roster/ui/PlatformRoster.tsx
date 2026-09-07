@@ -3,7 +3,7 @@ import { PlatformCard, type PlatformView } from '@/entities/platform'
 export function PlatformRoster({ platforms, now }: { platforms: PlatformView[]; now: number }) {
   return (
     <section>
-      <h2 className="mb-2 text-[10px] font-bold tracking-[0.3em] text-emerald-400/70">
+      <h2 className="mb-2 text-[10px] font-bold tracking-[0.3em] text-[#80e0ff]/70">
         INTERCEPTOR PLATFORMS
       </h2>
       <div className="flex flex-col gap-2">

@@ -63,6 +63,17 @@ body {
   display: block;
 }
 
+/* inline NATO icon used inside sidebar lists */
+.mil-inline {
+  display: inline-flex;
+  line-height: 0;
+  flex: none;
+}
+
+.mil-inline svg {
+  display: block;
+}
+
 .platform-label {
   margin-top: 2px;
   font-size: 10px;
@@ -120,7 +131,6 @@ body {
 .threat-marker.tracked .mil {
   outline: 1.5px solid #39d5ff;
   outline-offset: 2px;
-  border-radius: 4px;
 }
 
 .threat-label {

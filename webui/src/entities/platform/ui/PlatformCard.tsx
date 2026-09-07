@@ -1,3 +1,4 @@
+import { platformSymbol } from '@/shared/lib/milsymbol'
 import { ammoLabel, STALE_AFTER_MS, type PlatformView } from '../model/platform'
 
 export function PlatformCard({ view, now }: { view: PlatformView; now: number }) {
@@ -10,8 +11,13 @@ export function PlatformCard({ view, now }: { view: PlatformView; now: number })
       className={`border border-white/12 bg-white/[0.03] p-3 ${stale ? 'opacity-40' : ''}`}
     >
       <div className="flex items-baseline justify-between">
-        <span className="text-sm font-bold tracking-widest text-emerald-400">
-          ▲ {report.name.toUpperCase()}
+        <span className="flex items-center gap-1.5 text-sm font-bold tracking-widest text-[#80e0ff]">
+          <span
+            className="mil-inline"
+            aria-hidden
+            dangerouslySetInnerHTML={{ __html: platformSymbol(16) }}
+          />
+          {report.name.toUpperCase()}
         </span>
         <span className="text-[10px] text-neutral-500">{report.platform_id.slice(0, 8)}</span>
       </div>

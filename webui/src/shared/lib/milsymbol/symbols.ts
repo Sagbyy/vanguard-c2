@@ -26,22 +26,22 @@ function render(code: string, size: number): string {
 }
 
 // Ground-based interceptor site → friendly land Air-Defence unit (set 10, entity 130100).
-export function platformSymbol(size = 30): string {
+export function platformSymbol(size = 20): string {
   return render(sidc('3', '10', '130100'), size)
 }
 
-// Defended asset → friendly land installation / base (set 20, entity 120801).
-export function assetSymbol(size = 30): string {
-  return render(sidc('3', '20', '120801'), size)
+// Defended asset → friendly land installation / base (set 20, entity 120802).
+export function assetSymbol(size = 22): string {
+  return render(sidc('3', '20', '120802'), size)
 }
 
 // Interceptor effector in flight → friendly air missile (set 02, entity 110000).
-export function interceptorSymbol(size = 22): string {
+export function interceptorSymbol(size = 14): string {
   return render(sidc('3', '02', '110000'), size)
 }
 
 // Hostile / unknown air track. Affiliation and icon are driven by the fused classification.
-export function threatSymbol(classification: ThreatClassification, size = 28): string {
+export function threatSymbol(classification: ThreatClassification, size = 18): string {
   let affiliation: Affiliation = '6' // Hostile by default
   let symbolSet = '01' // Air
   let entity = '110000' // generic military air

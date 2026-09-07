@@ -107,7 +107,7 @@ export function ControlPanel({
           onChange={(v) => pushConfig({ ...cfg, max_active: v })} />
       </div>
 
-      <h2 className="mt-4 mb-2 text-[10px] font-bold tracking-[0.3em] text-emerald-400/70">
+      <h2 className="mt-4 mb-2 text-[10px] font-bold tracking-[0.3em] text-[#80e0ff]/70">
         ADD PLATFORM
       </h2>
       <button
@@ -160,7 +160,7 @@ export function ControlPanel({
           {platforms.map((view) => (
             <div key={view.report.platform_id}
               className="flex items-center justify-between text-[11px] text-neutral-400">
-              <span className="text-emerald-400/80">{view.report.name.toUpperCase()}</span>
+              <span className="text-[#80e0ff]/80">{view.report.name.toUpperCase()}</span>
               <span className="text-neutral-500">{(view.report.reach / 1000).toFixed(0)}km</span>
               <button type="button"
                 onClick={() => removePlatform(view.report.platform_id)}
