@@ -53,13 +53,14 @@ body {
   opacity: 0.35;
 }
 
-.platform-icon {
-  width: 0;
-  height: 0;
-  border-left: 8px solid transparent;
-  border-right: 8px solid transparent;
-  border-bottom: 14px solid #35f0a8;
-  filter: drop-shadow(0 0 6px rgba(53, 240, 168, 0.7));
+/* milsymbol (NATO APP-6D) icon wrapper shared by every map marker */
+.mil {
+  display: block;
+  line-height: 0;
+}
+
+.mil svg {
+  display: block;
 }
 
 .platform-label {
@@ -79,27 +80,18 @@ body {
   cursor: crosshair;
 }
 
-.threat-dot {
-  border-radius: 9999px;
-}
-
 .interceptor-marker {
-  width: 9px;
-  height: 9px;
-  background: #7df9ff;
-  border-radius: 9999px;
-  box-shadow: 0 0 8px 2px rgba(125, 249, 255, 0.8);
   cursor: pointer;
+  line-height: 0;
 }
 
-.interceptor-marker.diverting {
-  background: #ff9e2c;
-  box-shadow: 0 0 8px 2px rgba(255, 158, 44, 0.8);
+.interceptor-marker.diverting .mil svg {
+  filter: drop-shadow(0 0 4px #ff9e2c) drop-shadow(0 0 2px #ff9e2c);
 }
 
-.interceptor-marker.selected {
+.interceptor-marker.selected .mil {
   outline: 2px solid #fff;
-  outline-offset: 3px;
+  outline-offset: 2px;
 }
 
 .safe-marker {
@@ -125,9 +117,10 @@ body {
   white-space: nowrap;
 }
 
-.threat-marker.tracked .threat-dot {
+.threat-marker.tracked .mil {
   outline: 1.5px solid #39d5ff;
-  outline-offset: 4px;
+  outline-offset: 2px;
+  border-radius: 4px;
 }
 
 .threat-label {
@@ -142,14 +135,6 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-}
-
-.asset-core {
-  width: 14px;
-  height: 14px;
-  background: #39d5ff;
-  transform: rotate(45deg);
-  box-shadow: 0 0 12px 3px rgba(57, 213, 255, 0.6);
 }
 
 .asset-pulse {

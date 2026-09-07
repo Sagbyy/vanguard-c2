@@ -3,8 +3,14 @@ import maplibregl, { type GeoJSONSource, type StyleSpecification } from 'maplibr
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { useEffect, useRef, useState } from 'react'
 import { KYIV, fromLngLat, rangeRing, toLngLat, type Position } from '@/shared/lib/geo'
+import {
+  assetSymbol,
+  interceptorSymbol,
+  platformSymbol,
+  threatSymbol,
+} from '@/shared/lib/milsymbol'
 import type { Basemap } from '@/shared/config'
-import { CATEGORY_COLOR, trackCategory, type Threat, type ThreatClassification } from '@/entities/threat'
+import { trackCategory, type Threat, type ThreatClassification } from '@/entities/threat'
 import { STALE_AFTER_MS, type PlatformView } from '@/entities/platform'
 
 interface TacticalMapProps {
@@ -232,7 +238,8 @@ export function TacticalMap({
       const asset = document.createElement('div')
       asset.className = 'asset-marker'
       asset.innerHTML =
-        '<div class="asset-pulse"></div><div class="asset-core"></div><span class="asset-label">DEFENDED ASSET — KYIV</span>'
+        `<div class="asset-pulse"></div><div class="mil">${assetSymbol()}</div>` +
+        '<span class="asset-label">DEFENDED ASSET — KYIV</span>'
       new maplibregl.Marker({ element: asset }).setLngLat(KYIV).addTo(map)
 
       setReady(true)
@@ -370,7 +377,8 @@ export function TacticalMap({
         const el = document.createElement('div')
         el.className = 'platform-marker'
         el.innerHTML =
-          '<div class="platform-icon"></div><span class="platform-label"></span><div class="marker-tip"></div>'
+          `<div class="mil">${platformSymbol()}</div>` +
+          '<span class="platform-label"></span><div class="marker-tip"></div>'
         marker = new maplibregl.Marker({ element: el }).setLngLat(toLngLat(report.position)).addTo(map)
         markers.set(key, marker)
       }
@@ -391,7 +399,7 @@ export function TacticalMap({
       if (!marker) {
         const el = document.createElement('div')
         el.className = 'threat-marker'
-        el.innerHTML = '<div class="threat-dot"></div><span class="threat-label"></span><div class="marker-tip"></div>'
+        el.innerHTML = '<div class="mil"></div><span class="threat-label"></span><div class="marker-tip"></div>'
         const tid = threat.id
         el.addEventListener('click', (ev) => {
           if (selectedRef.current) {
@@ -406,20 +414,14 @@ export function TacticalMap({
       const el = marker.getElement()
       el.classList.toggle('tracked', trackedIds.has(threat.id))
 
-      const category = trackCategory(classifications.get(threat.id) ?? 'Unknown')
-      const color = CATEGORY_COLOR[category]
-      const dot = el.querySelector('.threat-dot') as HTMLElement
-      const size = 7 + threat.threat_level * 1.6
-      dot.style.width = `${size}px`
-      dot.style.height = `${size}px`
-      if (category === 'decoy') {
-        dot.style.background = 'transparent'
-        dot.style.border = `2px solid ${color}`
-        dot.style.boxShadow = 'none'
-      } else {
-        dot.style.background = color
-        dot.style.border = 'none'
-        dot.style.boxShadow = `0 0 10px 2px ${color}88`
+      const classification = classifications.get(threat.id) ?? 'Unknown'
+      const category = trackCategory(classification)
+      const size = 24 + threat.threat_level * 1.5
+      const mil = el.querySelector('.mil') as HTMLElement
+      const sig = `${classification}:${Math.round(size)}`
+      if (mil.dataset.sig !== sig) {
+        mil.dataset.sig = sig
+        mil.innerHTML = threatSymbol(classification, size)
       }
       const label =
         category === 'real' ? 'REAL' : category === 'decoy' ? 'DECOY' : 'UNKNOWN'
@@ -437,6 +439,7 @@ export function TacticalMap({
       if (!marker) {
         const el = document.createElement('div')
         el.className = 'interceptor-marker'
+        el.innerHTML = `<div class="mil">${interceptorSymbol()}</div>`
         const iid = it.id
         el.addEventListener('click', (ev) => {
           ev.stopPropagation()
